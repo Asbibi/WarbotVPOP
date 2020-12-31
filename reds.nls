@@ -103,27 +103,16 @@ to red-team-shoot
   
 end
 
-to goRedExplorer
-  red-team-go-back-to-base
-  red-team-go-and-eat
 
-  ifelse (not red-team-no-target?) [
-    red-team-call-rocket-launcher mem0 mem1 mem2
-    red-team-call-explorer mem0 mem1 mem2
-  ]
-  [ let h one-of perceive-robots ennemy
-    if ( h != nobody ) [ red-team-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
-  ]
-end
 
-to goRedRocketLauncher
-  red-team-go-back-to-base
-  red-team-select-target
-  red-team-shoot
-  red-team-go-and-eat
 
-  if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
-end
+
+
+
+
+
+
+
 
 
 
@@ -164,6 +153,70 @@ end
 
 
 
+
+
+
+
+
+
+to goRedExplorer
+  ;red-team-go-back-to-base
+  ;red-team-go-and-eat
+  
+  ;ifelse (not red-team-no-target?) [
+  ;  red-team-call-rocket-launcher mem0 mem1 mem2
+  ;  red-team-call-explorer mem0 mem1 mem2
+  ;]
+  ;[ let h one-of perceive-robots ennemy
+  ;  if ( h != nobody ) [ red-team-call-rocket-launcher [xcor] of h [ycor] of h [breed] of h]
+  ;]
+  
+  
+  (ifelse
+    item 0 mem5 = 0 [   ;Etat dans lequel l'explorer va chercher un tas ou une base adverse
+      (ifelse
+        item 1 mem5 = 0 [ 
+          ;SEARCH : se balade en ligne droite jusqu'à trouver une base adv, un tas ou retourner à la base          
+          ;s'il voit un harvester qui porte plus de 5 burgers, passe en état d'aide
+          
+          ;s'il voit + de 5 burgers en meme temps, en prend un au hasard et le désigne comme tas puis passe en etat de report si tas est sa priorité
+          ;s'il voit une base adv, enregistre ses coord puis passe en état de report si base est sa priorité          
+                
+        ]
+        item 1 mem5 = 1 [   
+          ;REPORT : retourne à la base
+          ;quand voit la base lui envoie les coordonnées
+          ;si voit un harvester et qu'il a les coordonnées d'un tas lui transmet, et s'il n'a pas de coord d'une base repart en SEARCH sinon il continue pour report la base adv
+          
+          
+        ]
+        item 1 mem5 = 2 [  
+          ;HELP : va vers l'harvester qu'il a vu
+          ;quand a reçu de la nourriture        
+      ])
+    ]
+    item 0 mem5 = 1 [
+      ;REFILL : retourne à la base pour recupérer de l'energie et donner les burgers portés
+    
+      
+  ])
+  
+  
+  ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
+  if (energy < 500) [
+    VPOP-replaceElement mem5 0 1    ; Si il n'y a plus d'énergie, il faut rentrer
+  ]
+  
+end
+
+to goRedRocketLauncher
+  red-team-go-back-to-base
+  red-team-select-target
+  red-team-shoot
+  red-team-go-and-eat
+
+  if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
+end
 
 to goRedHarvester
   ;;red-team-go-back-to-base
