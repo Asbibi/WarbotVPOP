@@ -124,10 +124,13 @@ end
 
 
 
-to VPOP-go-toward[cordToGoTo]
-  ; TODO :::::::::::::::::::::::::::: Esquiver les murs devant s'il y en a
-  ; TODO :::::::::::::::::::::::::::: Se tourner vers les coordonnées
-  forward-move speed
+to VPOP-go-toward[cord-to-go-to]
+  set heading towards cord-to-go-to
+  VPOP-foward-move speed
+end
+
+to VPOP-foward-move[movingSpeed]
+  forward-move movingSpeed
 end
 
 to VPOP-replaceElement[inList index newElement]  
@@ -159,7 +162,7 @@ end
 
 
 
-to goRedExplorer
+to goRedExplorer                      ;mem0 : coord de la base, mem1 : coord du tas trouvé, mem2 : coord de la base adv trouvée, ___ , mem5[0] : état, mem5[1] : priorité (0: tas, 1 : base adv)
   ;red-team-go-back-to-base
   ;red-team-go-and-eat
   
@@ -173,39 +176,43 @@ to goRedExplorer
   
   
   (ifelse
-    item 0 mem5 = 0 [   ;Etat dans lequel l'explorer va chercher un tas ou une base adverse
-      (ifelse
-        item 1 mem5 = 0 [ 
-          ;SEARCH : se balade en ligne droite jusqu'à trouver une base adv, un tas ou retourner à la base          
-          ;s'il voit un harvester qui porte plus de 5 burgers, passe en état d'aide
-          
-          ;s'il voit + de 5 burgers en meme temps, en prend un au hasard et le désigne comme tas puis passe en etat de report si tas est sa priorité
-          ;s'il voit une base adv, enregistre ses coord puis passe en état de report si base est sa priorité          
-                
-        ]
-        item 1 mem5 = 1 [   
-          ;REPORT : retourne à la base
-          ;quand voit la base lui envoie les coordonnées
-          ;si voit un harvester et qu'il a les coordonnées d'un tas lui transmet, et s'il n'a pas de coord d'une base repart en SEARCH sinon il continue pour report la base adv
-          
-          
-        ]
-        item 1 mem5 = 2 [  
-          ;HELP : va vers l'harvester qu'il a vu
-          ;quand a reçu de la nourriture        
-      ])
-    ]
-    item 0 mem5 = 1 [
-      ;REFILL : retourne à la base pour recupérer de l'energie et donner les burgers portés
-    
+    item 0 mem5 = 0 [      
+      ;SEARCH : se balade en ligne droite jusqu'à trouver une base adv, un tas ou retourner à la base          
+      ;s'il voit un harvester qui porte plus de 5 burgers, passe en état d'aide
       
-  ])
-  
+      ;s'il voit + de 5 burgers en meme temps, en prend un au hasard et le désigne comme tas
+      ;s'il voit une base adv, enregistre ses coord       
+      
+      ;check s'il a des coordonnées pour sa priorité -> si oui passe en état de report
+      
+      VPOP-foward-move speed
+      if (length perceive-food > 4)[
+        let burgerPerceived one-of perceive-food
+        VPOP-replaceElement mem1 0 ([xcor] of burgerPerceived)
+        VPOP-replaceElement mem1 1 ([ycor] of burgerPerceived)
+      ]
+    ]
+    item 0 mem5 = 1 [  
+      ;HELP : va vers l'harvester qu'il a vu
+      ;quand a reçu de la nourriture   
+      
+      
+    ]
+    item 0 mem5 = 2 [   
+      ;REPORT : retourne à la base
+      ;quand voit la base lui envoie les coordonnées
+      ;si voit un harvester et qu'il a les coordonnées d'un tas lui transmet
+      ; si sa prio est le tas alors il repart en search sauf s'il doit rentrer prendre de l'énergie, sinon il rentre dans tous les cas
+      
+      
+  ])  
   
   ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
+    ; Si il n'y a plus d'énergie, il faut rentrer
   if (energy < 500) [
-    VPOP-replaceElement mem5 0 1    ; Si il n'y a plus d'énergie, il faut rentrer
+    VPOP-replaceElement mem5 0 2  
   ]
+  ; Si il voit un autre explorer qui n'a pas de coord de tas ou de base alors que this en a alors on lui transmet
   
 end
 
@@ -316,6 +323,8 @@ end
 
 ;; procedure pour initialiser les explorers rouges
 to initRedExplorer
+  set mem1 [-1 -1]
+  set mem2 [-1 -1]
 end
 
 ;; procedure pour initialiser les rocket-launchers rouges
