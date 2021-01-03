@@ -153,6 +153,10 @@ to-report VPOP-is-arrived[targetCoord radius]
   ]
 end
 
+to-report VPOP-closest-base
+  report min-one-of my-bases [ distance myself ]
+end
+  
 
 
 
@@ -161,10 +165,9 @@ end
 
 
 
-
-to goRedExplorer                      ;mem0 : coord de la base, mem1 : coord du tas trouvé, mem2 : coord de la base adv trouvée, ___ , mem5[0] : état, mem5[1] : priorité (0: tas, 1 : base adv)
-  ;red-team-go-back-to-base
-  ;red-team-go-and-eat
+to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord de la base adv trouvée, mem2 : les coordonnées de l'harvester à aider, ___ , mem5[0] : état, mem5[1] : priorité (0: tas, 1 : base adv, 2 : help)
+                                      ;red-team-go-back-to-base
+                                      ;red-team-go-and-eat
   
   ;ifelse (not red-team-no-target?) [
   ;  red-team-call-rocket-launcher mem0 mem1 mem2
@@ -185,36 +188,112 @@ to goRedExplorer                      ;mem0 : coord de la base, mem1 : coord du 
       
       ;check s'il a des coordonnées pour sa priorité -> si oui passe en état de report
       
+      foreach (perceive-specific-robots color harvesters) [harvesterPerceived ->
+        if ([mem0] of harvesterPerceived > 4)[    
+          set mem2 harvesterPerceived
+        ]
+      ]
+      
+      
+      
       VPOP-foward-move speed
+      
       if (length perceive-food > 4)[
         let burgerPerceived one-of perceive-food
-        VPOP-replaceElement mem1 0 ([xcor] of burgerPerceived)
-        VPOP-replaceElement mem1 1 ([ycor] of burgerPerceived)
+        VPOP-replaceElement mem0 0 ([xcor] of burgerPerceived)
+        VPOP-replaceElement mem0 1 ([ycor] of burgerPerceived)
       ]
+      
+      let baseAdv one-of perceive-specific-robots ennemy bases
+      if (baseAdv != nobody) [
+        VPOP-replaceElement mem1 0 ([xcor] of baseAdv)
+        VPOP-replaceElement mem1 1 ([ycor] of baseAdv)        
+      ]
+      
+      (ifelse
+        item 1 mem5 = 0 [
+          if (item 0 mem0 != -1)[
+            VPOP-replaceElement mem5 0 2              ; on a un tas et c'est notre prio -> on report
+          ]
+        ]
+        item 1 mem5 = 1 [
+          if (item 0 mem1 != -1)[
+            VPOP-replaceElement mem5 0 2              ; on a une base adv et c'est notre prio -> on report
+          ]                  
+      ])
+      
+      if (item 0 mem5 != 2 and mem2 != -1)[           ; on n'a pas report ce tick et on a un harvester à aller aider
+        VPOP-replaceElement mem5 0 1        
+      ]      
     ]
     item 0 mem5 = 1 [  
       ;HELP : va vers l'harvester qu'il a vu
-      ;quand a reçu de la nourriture   
+      ;quand a reçu de la nourriture retourne à la base
       
-      
+      ifelse ((distance mem2 <= detection-range) and ([mem0] of mem2 > 4))[ ; on vérifies qu'on voit toujour le harvester et qu'il a toujours besoin d'aide
+        VPOP-go-toward mem2
+      ]
+      [
+        set mem2 -1
+        ifelse (carrying-food? > 0) [
+          VPOP-replaceElement mem5 0 2 ; on a des burgers sur nous -> Retour à la base
+        ] [
+          VPOP-replaceElement mem5 0 0 ; on n'a pas de burger sur nous -> Retour à la recherche (si on est en help c'est qu'on a rien de prioritaire à report à la base)          
+        ]        
+      ]
     ]
-    item 0 mem5 = 2 [   
+    item 0 mem5 = 2 [
       ;REPORT : retourne à la base
-      ;quand voit la base lui envoie les coordonnées
-      ;si voit un harvester et qu'il a les coordonnées d'un tas lui transmet
+      ; si voit un harvester et qu'il a les coordonnées d'un tas lui transmet
       ; si sa prio est le tas alors il repart en search sauf s'il doit rentrer prendre de l'énergie, sinon il rentre dans tous les cas
+      ; quand voit la base lui envoie les coordonnées => base adv : mem1; tas : mem2 => si sa prio était de trouver une base et qu'il en avait une il se met en prio sur l'aide d'harvester
       
+      set mem2 -1   ; Si on avait vu un harvester demandant de l'aide on l'oublie
+      VPOP-go-toward VPOP-closest-base
+      if (item 0 mem0 != -1) [     ;Si on a un tas en mémoire on regarde si on croise 
+        if (length perceive-specific-robots color harvesters > 4)[
+          foreach (perceive-specific-robots color harvesters) [harvesterPerceived ->
+            let infoTas mem0
+            ask harvesterPerceived [set mem1 infoTas]
+          ]
+          if (item 1 mem5 = 0)[                         ; la priorité du robot est le tas
+            set mem0 -1                                 ; l'info du tas a été transmise => on l'oublie            
+            if (energy >= 500)[   ; si l'énergie est suffisante on repart à la recherche de d'un tas
+              rt random 360 ; avant de repartir on se tourne dans une direction aléatoire
+              VPOP-replaceElement mem5 0 0  
+            ]
+          ]
+        ]
+      ]
       
+      let basePerceived one-of perceive-specific-robots color bases
+      if (basePerceived != nobody)[
+        ;TODO : transmettre les info à la base
+        let infoTas mem0
+        ask basePerceived [set mem0 infoTas]
+        let infoBase mem1
+        ask basePerceived [set mem1 infoBase]
+        
+        VPOP-replaceElement mem5 0 3  
+      ]
+    ]
+    item 0 mem5 = 3 [
+      ;IDDLE : on attend d'avoir assez d'énergie pour repartir
+      if (energy > 999)[
+        VPOP-replaceElement mem5 0 0
+      ]      
   ])  
   
   ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
-    ; Si il n'y a plus d'énergie, il faut rentrer
+  ; Si il n'y a plus d'énergie, il faut rentrer
   if (energy < 500) [
     VPOP-replaceElement mem5 0 2  
   ]
   ; Si il voit un autre explorer qui n'a pas de coord de tas ou de base alors que this en a alors on lui transmet
   
 end
+
+
 
 to goRedRocketLauncher
   red-team-go-back-to-base
@@ -225,7 +304,7 @@ to goRedRocketLauncher
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
-to goRedHarvester
+to goRedHarvester                               ;mem0 : carryingFood?, pour pouvoir l'exposer aux autres robots ;mem1 : coord du tas à aller cherher, ___ , mem5[0] : état, mem5[1] : sous-état
   ;;red-team-go-back-to-base
   ;;red-team-harvesters-go-and-eat
   
@@ -280,8 +359,9 @@ to goRedHarvester
                         ; se dirige vers la base, quand voit la base passe à l'état suivant
                         ; si la distance à la base est < ??? planter un burger avant d'avancer
                         ; si voit un explorer et que l'harvester carry > ?, donner le surplus à l'explorer
-      VPOP-go-toward mem0
-      if (VPOP-is-arrived mem0 10) [
+      let closest-base VPOP-closest-base
+      VPOP-go-toward closest-base
+      if (VPOP-is-arrived closest-base 10) [
         plant-seeds color max-seeds 
       ]
       if (carrying-food? > 5) [ ; 5 designe la quantité de burgers que l'harvester va garder pour pouvoir les planter
@@ -310,6 +390,9 @@ to goRedHarvester
   if (energy < 500) [
     VPOP-replaceElement mem5 0 1    
   ]
+  
+  ;on expose la quantité de burgers portés
+  set mem0 carrying-food?
 end
 
 to goRedBase
@@ -323,8 +406,9 @@ end
 
 ;; procedure pour initialiser les explorers rouges
 to initRedExplorer
+  set mem0 [-1 -1]
   set mem1 [-1 -1]
-  set mem2 [-1 -1]
+  set mem3 -1
 end
 
 ;; procedure pour initialiser les rocket-launchers rouges
