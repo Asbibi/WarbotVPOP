@@ -1184,13 +1184,13 @@ to go-perception
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-213
+196
 10
-997
-346
+1572
+596
 -1
 -1
-6.4132231405
+11.314
 1
 10
 1
@@ -1273,7 +1273,7 @@ SWITCH
 132
 display-range?
 display-range?
-1
+0
 1
 -1000
 
@@ -1332,10 +1332,10 @@ energy_green
 11
 
 PLOT
-213
-347
-997
-562
+203
+594
+987
+809
 plot 1
 NIL
 NIL

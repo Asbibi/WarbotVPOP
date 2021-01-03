@@ -126,11 +126,16 @@ end
 
 to VPOP-go-toward[cord-to-go-to]
   set heading towards cord-to-go-to
-  VPOP-foward-move speed
+  VPOP-forward-move speed
 end
 
-to VPOP-foward-move[movingSpeed]
-  forward-move movingSpeed
+to VPOP-forward-move[movingSpeed]
+  let try 0
+    while[try < 10 and free-ahead? movingSpeed != nobody][
+    rt random 180
+    set try try + 1
+  ]
+  if (free-ahead? movingSpeed = nobody) [forward-move movingSpeed]
 end
 
 to VPOP-replaceElement[inList index newElement]  
@@ -196,7 +201,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       
       
       
-      VPOP-foward-move speed
+      VPOP-forward-move speed
       
       if (length perceive-food > 4)[
         let burgerPerceived one-of perceive-food
@@ -296,15 +301,40 @@ end
 
 
 to goRedRocketLauncher
-  red-team-go-back-to-base
-  red-team-select-target
-  red-team-shoot
-  red-team-go-and-eat
-
+  ifelse (energy < 1000) or (nb-missiles = 0)
+  [
+    red-team-go-back-to-base
+  ]
+  [
+    red-team-select-target ;; a faire maison
+    ifelse (red-team-no-target?)[ ;;same
+      ifelse (mem4 != 0)[
+        ;;VPOP-charge
+      ]
+      [
+        VPOP-defend
+      ]
+    ]
+    [red-team-shoot]
+  ]
+  
+  ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
-to goRedHarvester                               ;mem0 : carryingFood?, pour pouvoir l'exposer aux autres robots ;mem1 : coord du tas à aller cherher, ___ , mem5[0] : état, mem5[1] : sous-état
+to VPOP-defend
+  
+  let b min-one-of my-bases [ distance myself ]
+  if (b != nobody) [
+    set heading towards b
+    ifelse (distance b < 7)[rt 180]
+    [if (distance b < 10)[rt 90]]
+    VPOP-forward-move speed
+  ]
+  
+end
+
+to goRedHarvester
   ;;red-team-go-back-to-base
   ;;red-team-harvesters-go-and-eat
   
@@ -397,11 +427,29 @@ end
 
 to goRedBase
   set label energy
-  if (energy > 12000) [ new-RocketLauncher self ]
+  if (mem6 > 0) and (energy > 7000) [
+    (ifelse
+      mem7 < 2 [;; nombre de harvester par RL/explo
+                     ;;new-Harvester self
+      ]
+      mem7 < 3 [  
+        ;;new-Explorer self
+      ]
+      mem7 < 4 [      
+        new-RocketLauncher self
+        set mem6 mem6 - 1
+        set mem7 0 ])
+      set mem7 mem7 + 1 ]
+  
+  if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
+  if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
+  
   let t one-of perceive-specific-robots ennemy rocketlaunchers
   if (t != nobody) [
-    launch-rocket towards t
+    ;; regarde s'il y a des robots amis en direction de la cible potentielle t avant de tirer
+    if (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
   ]
+  
 end
 
 ;; procedure pour initialiser les explorers rouges
@@ -421,4 +469,5 @@ end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
+  set mem6 3
 end
