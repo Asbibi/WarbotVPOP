@@ -1204,8 +1204,8 @@ GRAPHICS-WINDOW
 60
 -25
 25
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -1307,7 +1307,7 @@ CHOOSER
 display?
 display?
 "none" "energy" "missiles" "carrying-food?" "carried-walls-nrj" "mem0" "mem1" "mem2" "mem3" "mem4" "mem5"
-0
+1
 
 MONITOR
 30
