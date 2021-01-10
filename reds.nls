@@ -301,14 +301,14 @@ end
 
 
 to goRedRocketLauncher
-  ifelse (energy < 1000) or (nb-missiles = 0)
+  ifelse (energy < 1000 or mem3 = -1)
   [
     red-team-go-back-to-base
   ]
   [
     red-team-select-target ;; a faire maison
     ifelse (red-team-no-target?)[ ;;same
-      ifelse (mem4 != 0)[
+      ifelse (mem0 != 0)[
         ;;VPOP-charge
       ]
       [
@@ -331,6 +331,25 @@ to VPOP-defend
     [if (distance b < 10)[rt 90]]
     VPOP-forward-move speed
   ]
+end
+
+to VPOP-chaaarge
+  
+  let eBase mem0
+  ;verifie que la base existe encore
+  if (distance eBase < 5)[
+    let tBase perceive-base ennemy
+    if (tBase = nobody)[
+      set mem3 -1]]
+  
+  ;;Tourne autour de la base en tirant
+  set heading towards eBase
+  if (distance eBase <= 10)[
+    launch-rocket towards eBase
+    rt 90
+    if (distance eBase < 5)[rt 180]
+  ]
+  VPOP-forward-move speed  
   
 end
 
@@ -427,23 +446,48 @@ end
 
 to goRedBase
   set label energy
+  
+  ;;Transmet l'info de tas à un harvester
+  let infoTas mem0
+  if (infoTas != -1)[
+    let t one-of perceive-specific-robots color harvesters
+    ifelse (t != nobody)[
+      ask t [set mem0 infoTas]
+      set mem0 -1]
+    [if (energy > 5000)[
+      new-Harvester self
+      let t2 one-of perceive-specific-robots color harvesters
+      ask t2 [set mem0 infoTas]
+      set mem0 -1]]]
+    
+  ;;Transmet l'info de base ennemie aux RL
+  let infoBase mem1
+  if (infoBase != -1)[
+    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!
+    let rls perceive-specific-robots color rocketlaunchers
+    if (rls != nobody)[
+      foreach rls[rl -> ask rl [set mem1 infoBase]]]]
+  
+  ;;Créé les robots 1 par 1
   if (mem6 > 0) and (energy > 7000) [
     (ifelse
       mem7 < 2 [;; nombre de harvester par RL/explo
-                     ;;new-Harvester self
+        new-Harvester self
       ]
-      mem7 < 3 [  
-        ;;new-Explorer self
+      mem7 = 2 [  
+        new-Explorer self
       ]
-      mem7 < 4 [      
+      mem7 = 3 [      
         new-RocketLauncher self
-        set mem6 mem6 - 1
-        set mem7 0 ])
-      set mem7 mem7 + 1 ]
-  
+      set mem6 mem6 - 1
+      set mem7 0 ])
+    set mem7 mem7 + 1 ]
+
   if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
   if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
   
+
+  ;;Tire sur les RL proches
   let t one-of perceive-specific-robots ennemy rocketlaunchers
   if (t != nobody) [
     ;; regarde s'il y a des robots amis en direction de la cible potentielle t avant de tirer
@@ -461,6 +505,8 @@ end
 
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
+  set mem1 -1 ;coordonées de la base ennemie
+  set mem3 0 ;retour a la base après attaque
 end
 
 ;; procedure pour initialiser les harvesters rouges
@@ -469,5 +515,8 @@ end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
-  set mem6 3
+  set mem0 -1 ;coordonées d'un tas
+  set mem1 -1 ;coordonées de la base ennemie
+  set mem6 3 ;nombre d'harvesters a produire ? a suprimer
+  set mem7 0 ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
 end
