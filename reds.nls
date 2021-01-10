@@ -75,6 +75,7 @@ to red-team-call-explorer [ x y espece ]
     ]
   ]
 end
+    
 
 to red-team-select-target
   if (red-team-no-target?)
@@ -306,8 +307,8 @@ to goRedRocketLauncher
     red-team-go-back-to-base
   ]
   [
-    red-team-select-target ;; a faire maison
-    ifelse (red-team-no-target?)[ ;;same
+    VPOP-select-target-fire-and-chase
+    ifelse (VPOP-no-target?)[
       ifelse (mem0 != 0)[
         ;;VPOP-charge
       ]
@@ -352,6 +353,42 @@ to VPOP-chaaarge
   VPOP-forward-move speed  
   
 end
+
+to-report VPOP-no-target?
+  report item 0 mem5 = -1
+end
+
+to VPOP-select-target-fire-and-chase
+  
+  ;;Cherche une cible
+  if (VPOP-no-target?)[
+    let t min-one-of perceive-specific-robots ennemy RocketLaunchers [ distance myself ] ;;Cherche d'abord les RL ennemis (le plus proche)
+    ifelse (t != nobody)[
+      set mem5 t
+    ]
+    [
+      let h min-one-of perceive-robots ennemy [ distance myself ]
+      if (h != nobody)[
+        set mem5 h
+      ]
+    ]
+  ]
+  
+  ;;Verifie que la cible est en vie
+  if (distance mem5 < 5)[
+    let g perceive-robots ennemy
+    if (g = nobody)[
+      set mem5 -1]]
+  
+  ;;Tire sur la cible 
+  if (not VPOP-no-target?)[
+    let currenTarget mem5
+    launch-faf currenTarget ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy [xcor] of currenTarget [ycor] of currenTarget;;sinon on tire un missile
+    VPOP-go-toward currenTarget
+  ]
+    
+end 
 
 to goRedHarvester
   ;;red-team-go-back-to-base
@@ -507,6 +544,7 @@ end
 to initRedRocketLauncher
   set mem1 -1 ;coordonées de la base ennemie
   set mem3 0 ;retour a la base après attaque
+  set mem5 -1; Cible
 end
 
 ;; procedure pour initialiser les harvesters rouges
