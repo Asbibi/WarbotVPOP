@@ -170,7 +170,7 @@ end
 
 
 
-to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord de la base adv trouvée, mem2 : les coordonnées de l'harvester à aider, mem3 : timer de spy de base, ___ , mem5[0] : état, mem5[1] : priorité (0: tas, 1 : base adv, 2 : help)
+to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord de la base adv trouvée, mem2 : les coordonnées de l'harvester à aider, mem3 : timer de spy de base, mem4 : timer d'aide de rl , mem5[0] : état, mem5[1] : priorité (0: tas, 1 : base adv, 2 : help)
                                       ;red-team-go-back-to-base
                                       ;red-team-go-and-eat
   
@@ -195,10 +195,24 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       ;s'il voit une base adv, enregistre ses coord       
       
       ;check s'il a des coordonnées pour sa priorité -> si oui passe en état de report
+      
+      ifelse (mem4 < 0)[
+        let rls perceive-specific-robots color rocketLaunchers
+        let rl one-of rls with [mem1 != -1 and mem1 != -2]
+        if (rl != nobody)[
+          set mem1 [mem1] of rl
+          set mem5 replace-item 0 mem5 4
+        ]
+      ][
+        set mem4 mem4 - 1
+      ]
+      
+      
       let harvesters-perceived perceive-specific-robots color harvesters
       let harvester-perceived one-of harvesters-perceived with [mem0 > 2000]
       if (harvester-perceived != nobody)[
-        set mem2 harvester-perceived]
+        set mem2 harvester-perceived
+      ]
       ;      if (harvesters-perceived != nobody)[
       ;      foreach (harvesters-perceived) [harvesterPerceived ->
       ;        if ([mem0] of harvesterPerceived > 4)[    
@@ -315,23 +329,30 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
         set mem5 replace-item 0 mem5 0] 
     ]
     
+    
+          
+      
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================
+      ;=========================================================================================================================================================================     
+      
+      
+    
+    
+    
     item 0 mem5 = 4 [
       ; Go-SPY : Va à la base indiquée pour savoir si elle est encore en vie
       if (mem1 != [-1 -1])[
         ifelse (VPOP-has-arrived mem1 9)[
-          let bse min-one-of perceive-specific-robots ennemy bases [distance myself]
-          ifelse (bse != nobody)[
-            ; la base n'est pas morte
-            show "Not killed yet"
-            show bse
-            set mem5 replace-item 0 mem5 5
-            set mem3 60 ;timer de check
-          ][
-            ; la base est morte
-            set mem5 replace-item 0 mem5 6
-            show "Base adversaire annihilée"
-            set mem3 0
-          ]
+          set mem3 60
+          set mem5 replace-item 0 mem5 5
         ][
           VPOP-go-towardxy mem1 
         ]
@@ -339,13 +360,18 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
     ]
     item 0 mem5 = 5 [
       ; SPY : se met en retrait et va périodiquement checker la base adv
-      ifelse (mem3 = 0)[
+      ifelse (mem3 < 0)[
         ifelse (VPOP-has-arrived mem1 9)[
           let bse min-one-of perceive-specific-robots ennemy bases [distance myself]
           ifelse (bse != nobody)[
             ; la base n'est pas morte
             set mem3 60 ;timer de check
             show "Base adversaire en vie, checkons plus tard"
+            set mem4 mem4 + 75
+            if (mem4 > 200)[
+              rt random 360
+              set mem5 replace-item 0 mem5 0              
+            ]
           ][
             ; la base est morte
             set mem5 replace-item 0 mem5 6
@@ -366,26 +392,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
     ]
     item 0 mem5 = 6 [
       ; STOP-SPY : Indique aux robots encore sur place d'arreter d'attaquer
-      
-      
-      
-      
-      
-      
-      
-      
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================
-      ;=========================================================================================================================================================================     
-      
-      
+
       set mem3 mem3 + 1     
 
       set heading towardsxy item 0 mem1 item 1 mem1
@@ -398,30 +405,32 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       
       
       let rlsPerceived perceive-specific-robots color rocketlaunchers 
-      set rlsPerceived rlsPerceived with [mem1 != [-1 -1]]
+      set rlsPerceived rlsPerceived with [mem1 != -1 and mem1 != -2]
       let rlPerceived one-of rlsPerceived
       while[rlPerceived != nobody][
-        ask rlPerceived [set mem1 [-1 -1]]
+        ask rlPerceived [set mem1 -1]
         
         set rlsPerceived perceive-specific-robots color rocketlaunchers 
-        set rlsPerceived rlsPerceived with [mem1 != [-1 -1]]
+        set rlsPerceived rlsPerceived with [mem1 != -1 and mem1 != -2]
         set rlPerceived one-of rlsPerceived
       ]
-      if (VPOP-has-arrived mem1 1)[
+      if (mem3 > 65)[
           set mem5 replace-item 0 mem5 7     
       ]
     ]
     item 0 mem5 = 7 [
       ;REPORT-SPY : Retourne à la base alliée pour lui indiquer que la basze adv est morte + dire aux harvesters qu'il voit qu'il y a un tas là-bas + dire aux rocketLaunch qui vont attaquer la base que c'est fini
       
+      
+      
       let rlsPerceived perceive-specific-robots color rocketlaunchers 
-      set rlsPerceived rlsPerceived with [mem1 != [-1 -1]]
+      set rlsPerceived rlsPerceived with [mem1 != -1 and mem1 != -2]
       let rlPerceived one-of rlsPerceived
       while[rlPerceived != nobody][
-        ask rlPerceived [set mem1 [-1 -1]]
+        ask rlPerceived [set mem1 -1]
         
         set rlsPerceived perceive-specific-robots color rocketlaunchers 
-        set rlsPerceived rlsPerceived with [mem1 != [-1 -1]]
+        set rlsPerceived rlsPerceived with [mem1 != -1 and mem1 != -2]
         set rlPerceived one-of rlsPerceived
       ]
       
@@ -439,11 +448,11 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       ]
       
       VPOP-go-toward VPOP-closest-base
-      let bs one-of perceive-specific-robots color bases
-      if (bs != nobody and [mem1] of bs != [-1 -1])[
-        ask bs [set mem1 [-1 -1]]
-        ask bs [set mem3 0]        
-        set mem5 [0 1]; Retour à l'exploration normale + prio de base     
+      let bs min-one-of perceive-specific-robots color bases [distance myself]
+      if (bs != nobody)[
+        set mem1 [-1 -1]
+        ask bs [set mem1 [-1 -1]] 
+        set mem5 [0 2]; Retour à l'exploration normale   
       ]
   ])  
   
@@ -590,11 +599,29 @@ to goRedHarvester
                         ; si la distance à la base est < ??? planter un burger avant d'avancer
                         ; si voit un explorer et que l'harvester carry > ?, donner le surplus à l'explorer
       let closest-base VPOP-closest-base
-      VPOP-go-toward closest-base
-      if (distance closest-base < 15) [
+      if (distance closest-base < 12) [
         VPOP-ask-for-energy 1700
-        plant-seeds color max-seeds 
+        ; compte le nombre de graine ici
+        let nb-seeds count Seeds-here
+        ifelse (nb-seeds > 0)[
+          ifelse (mem3 > 50)[
+            ;n'arrive pas à planter : il faut avancer
+            VPOP-go-toward closest-base
+            set mem3 0
+          ][
+            set heading towards closest-base
+            rt 90
+            VPOP-forward-move speed
+            set mem3 mem3 + 1
+          ]
+        ][
+          set mem3 0
+          plant-seeds color max-seeds 
+          VPOP-go-toward closest-base
+        ]
       ]
+      
+      VPOP-go-toward closest-base
       if (carrying-food? > 0) [
         let basePerceived one-of perceive-specific-robots color bases
         if (basePerceived != nobody) [
@@ -647,19 +674,19 @@ to goRedBase
   ]]]
   
   ;;Transmet l'info de base ennemie aux RL
-;  let infoBase mem1
-;  if (infoBase != [-1 -1])[
-;    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
-;    let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
-;    set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
-;    let RocketLauncherPerceived one-of RocketLaunchersPerceived
-;    while[RocketLauncherPerceived != nobody][
-;      ask RocketLauncherPerceived [set mem1 infoBase]
-;      set RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
-;      set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
-;      set RocketLauncherPerceived one-of RocketLaunchersPerceived
-;  ]]
-;  
+  let infoBase mem1
+  if (infoBase != [-1 -1])[
+    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
+    let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
+    set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
+    let RocketLauncherPerceived one-of RocketLaunchersPerceived
+    while[RocketLauncherPerceived != nobody][
+      ask RocketLauncherPerceived [set mem1 infoBase]
+      set RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
+      set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
+      set RocketLauncherPerceived one-of RocketLaunchersPerceived
+  ]]
+  
   
   
   
