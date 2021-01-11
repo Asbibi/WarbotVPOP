@@ -209,7 +209,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       
       
       let harvesters-perceived perceive-specific-robots color harvesters
-      let harvester-perceived one-of harvesters-perceived with [mem0 > 2000]
+      let harvester-perceived one-of harvesters-perceived with [mem0 > 4000]
       if (harvester-perceived != nobody)[
         set mem2 harvester-perceived
       ]
@@ -323,7 +323,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
         ifelse (distance VPOP-closest-base > 2)
         [VPOP-go-toward VPOP-closest-base]
         [give-food VPOP-closest-base carrying-food?
-          VPOP-ask-for-energy 1000 - energy]
+          VPOP-ask-for-energy 700 - energy]
       ]
       [
         set mem5 replace-item 0 mem5 0] 
@@ -351,7 +351,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       ; Go-SPY : Va à la base indiquée pour savoir si elle est encore en vie
       if (mem1 != [-1 -1])[
         ifelse (VPOP-has-arrived mem1 9)[
-          set mem3 60
+          set mem3 30
           set mem5 replace-item 0 mem5 5
         ][
           VPOP-go-towardxy mem1 
@@ -360,14 +360,31 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
     ]
     item 0 mem5 = 5 [
       ; SPY : se met en retrait et va périodiquement checker la base adv
+      
+      ; On regarde s'il y a pas déjà un explorer qui espionne la base
+      let explosPerceived perceive-specific-robots color explorers 
+      set explosPerceived explosPerceived with [item 0 mem5 = 5]
+      let exploPerceived one-of explosPerceived
+      while[exploPerceived != nobody and exploPerceived != myself][
+        ask exploPerceived [set mem4 200]
+        ask exploPerceived [set mem5 replace-item 0 mem5 0]
+        
+        set explosPerceived perceive-specific-robots color explorers 
+        set explosPerceived explosPerceived with [item 0 mem5 = 5]
+        set exploPerceived one-of explosPerceived
+      ]
+      
+      
+      
+      
       ifelse (mem3 < 0)[
         ifelse (VPOP-has-arrived mem1 9)[
           let bse min-one-of perceive-specific-robots ennemy bases [distance myself]
           ifelse (bse != nobody)[
             ; la base n'est pas morte
-            set mem3 60 ;timer de check
+            set mem3 30 ;timer de check
             show "Base adversaire en vie, checkons plus tard"
-            set mem4 mem4 + 75
+            set mem4 mem4 + 35
             if (mem4 > 200)[
               rt random 360
               set mem5 replace-item 0 mem5 0              
@@ -452,7 +469,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       if (bs != nobody)[
         set mem1 [-1 -1]
         ask bs [set mem1 [-1 -1]] 
-        set mem5 [0 2]; Retour à l'exploration normale   
+        set mem5 [0 0]; Retour à l'exploration normale   
       ]
   ])  
   
@@ -586,7 +603,7 @@ to goRedHarvester
           
           random-move
           set mem2 (mem2 - 1)
-          if (mem2 < 0)[
+          if (mem2 < 0 or carrying-food? > 15000)[
             set mem5 [1 0]
           ]
           ;RECOLTE : pendant x tick wander autour des coord du tas et récolte ce qu'il voit
@@ -598,16 +615,21 @@ to goRedHarvester
                         ; se dirige vers la base, quand voit la base passe à l'état suivant
                         ; si la distance à la base est < ??? planter un burger avant d'avancer
                         ; si voit un explorer et que l'harvester carry > ?, donner le surplus à l'explorer
+      let burgerPerceived min-one-of perceive-food [ distance myself ]
+      while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
+        take-food burgerPerceived
+        set burgerPerceived min-one-of perceive-food [ distance myself ]
+      ]
+      
       let closest-base VPOP-closest-base
-      if (distance closest-base < 12) [
+      if (distance closest-base < 8 or (distance closest-base < 15 and distance closest-base > 11)) [
         VPOP-ask-for-energy 1700
         ; compte le nombre de graine ici
         let nb-seeds count Seeds-here
         ifelse (nb-seeds > 0)[
           ifelse (mem3 > 50)[
             ;n'arrive pas à planter : il faut avancer
-            VPOP-go-toward closest-base
-            set mem3 0
+            VPOP-go-toward closest-base            
           ][
             set heading towards closest-base
             rt 90
@@ -636,10 +658,10 @@ to goRedHarvester
   
   ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
   
-  if (carrying-food? > 2000) [ ; 5 designe la quantité de burgers que l'harvester va garder pour pouvoir les planter
+  if (carrying-food? > 4000) [ ; 5 designe la quantité de burgers que l'harvester va garder pour pouvoir les planter
     let explorerPerceived one-of perceive-specific-robots color explorers
     if (explorerPerceived != nobody) [
-      give-food explorerPerceived (carrying-food? - 2000)
+      give-food explorerPerceived (carrying-food? - 4000)
     ]
   ]   
   
