@@ -257,7 +257,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       ;HELP : va vers l'harvester qu'il a vu
       ;quand a reçu de la nourriture retourne à la base
       
-      ifelse ((distance mem2 <= detection-range) and ([mem0] of mem2 > 1000))[ ; on vérifies qu'on voit toujour le harvester et qu'il a toujours besoin d'aide
+      ifelse ((distance mem2 <= detection-range) and ([mem0] of mem2 > 4000))[ ; on vérifies qu'on voit toujour le harvester et qu'il a toujours besoin d'aide
         VPOP-go-toward mem2
       ]
       [
