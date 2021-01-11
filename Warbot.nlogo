@@ -1,4 +1,4 @@
-__includes [ "parameters.nls" "reds.nls" "greens.nls" ]
+__includes [ "parameters.nls" "reds.nls" "LuftFAFfe.nls"]
 
 ; definition des especes
 breed [ Explorers Explorer ]

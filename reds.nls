@@ -463,11 +463,12 @@ to goRedRocketLauncher
   ifelse (energy < 1000) or (mem3 = -1)
   [
     ifelse (distance VPOP-closest-base > 2)
-    [VPOP-go-toward VPOP-closest-base]
+    [VPOP-go-toward VPOP-closest-base
+      set mem1 -1]
     [VPOP-ask-for-energy 4000 - energy]
   ]
   [
-    ifelse(mem1 != [-1 -1])[
+    ifelse(mem1 != -1) and (mem1 != -2)[
       VPOP-chaaarge
     ]
     [
@@ -646,57 +647,41 @@ to goRedBase
   ]]]
   
   ;;Transmet l'info de base ennemie aux RL
-  let infoBase mem1
-  if (infoBase != [-1 -1])[
-    ifelse (mem3 < 1000)[
-      set mem3 mem3 + 1 
-    ][
-      ifelse (mem3 = 1000)[
-        if ( energy > 5000)[
-          new-Explorer self
-          let explo one-of perceive-specific-robots color explorers
-          if (explo != nobody)[
-            show "Brave explorer"
-            show explo
-            ask explo [set mem5 [4 1]]
-            ask explo [set mem1 infoBase]
-            set mem3 mem3 + 1          
-          ]
-        ]
-      ][
-        set mem3 mem3 + 1  
-        if (mem3 > 3000)[
-          set mem3 0]
-      ]
-    ]
-    
-    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
-    let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
-    set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = [-1 -1]]
-    let RocketLauncherPerceived one-of RocketLaunchersPerceived
-    while[RocketLauncherPerceived != nobody][
-      ask RocketLauncherPerceived [set mem1 infoBase]
-      set RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
-      set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = [-1 -1]]
-      set RocketLauncherPerceived one-of RocketLaunchersPerceived
-  ]]
+;  let infoBase mem1
+;  if (infoBase != [-1 -1])[
+;    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
+;    let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
+;    set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
+;    let RocketLauncherPerceived one-of RocketLaunchersPerceived
+;    while[RocketLauncherPerceived != nobody][
+;      ask RocketLauncherPerceived [set mem1 infoBase]
+;      set RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
+;      set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
+;      set RocketLauncherPerceived one-of RocketLaunchersPerceived
+;  ]]
+;  
   
-
+  
   
   ;;Créé les robots 1 par 1
   if (mem6 > 0) and (energy > 15000) [
-    (ifelse
-      mem7 < 2 [;; nombre de harvester par RL/explo
-        new-Harvester self
-      ]
-      mem7 = 2 [  
-        new-Explorer self
-      ]
-      mem7 = 3 [      
-        new-RocketLauncher self
-        set mem6 mem6 - 1
-        set mem7 0 ])
-    set mem7 mem7 + 1 ]
+    ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
+      (ifelse
+        mem7 < 2 [;; nombre de harvester par RL/explo
+          new-Harvester self
+        ]
+        mem7 = 2 [  
+          new-Explorer self
+        ]
+        mem7 = 3 [      
+          new-RocketLauncher self
+          set mem6 mem6 - 1
+          set mem7 0 ])
+      set mem7 mem7 + 1 ]
+    [;Si il n'y a pas de RL en defense, on en créé un qui restera en def
+      new-RocketLauncher self
+      ask one-of perceive-specific-robots color rocketlaunchers [set mem1 -2]]
+  ]
   
   if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
   if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
@@ -722,7 +707,7 @@ end
 
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
-  set mem1 [-1 -1];coordonées de la base ennemie
+  set mem1 -1; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
   set mem3 0 ;retour a la base après attaque
   set mem5 -1; Cible
 end
