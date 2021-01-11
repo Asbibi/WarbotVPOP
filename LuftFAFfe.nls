@@ -1,0 +1,706 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; le code de l'equipe Green
+;; préfixe : Green-team
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to-report Green-team-enemy-close? 
+  report mem0 != nobody;
+end
+
+to-report Green-team-enemy-base-is-know? 
+  report mem1 != 0 or mem2 != 0;
+end
+
+to-report Green-team-all-enemy-base-is-know? 
+  report mem1 != 0 and mem2 != 0;
+end
+
+to-report Green-team-should-report-to-base? 
+  report mem5 = 1 or mem5 = 2;
+end
+
+to-report Green-team-enemy-base-closest-dist? 
+  let dist -1
+  if(mem1 != 0) [set dist distancexy (first mem1) (last mem1)]
+  if(mem2 != 0) [
+    let dist2 distancexy (first mem2) (last mem2)
+    if(dist = -1 or dist2 < dist) [set dist dist2] 
+  ]
+  report dist
+end
+
+to-report Green-team-should-return-to-base? 
+  if([breed] of self = harvesters)[
+      report energy < 300
+  ]
+  if([breed] of self = rocketlaunchers)[
+    report energy < 500
+  ]
+  if([breed] of self = explorers)[
+    report energy < 100
+  ]
+  report false
+end
+
+to-report Green-team-should-harvest?
+  if (carrying-food? > 1000) [
+    report false
+  ]
+  
+  let f min-one-of perceive-food [ distance myself ]
+  report f != nobody
+end
+
+to-report Green-team-should-plant?
+  report carrying-food? > 500
+end
+
+to-report Green-team-have-burger?
+  report carrying-food? > 0
+end
+
+to-report Green-team-ready-to-attack-base? 
+  report mem4 = 1
+end
+
+to-report Green-team-ally-toward-ennemy [ r ]
+  let owner self
+  let b false;
+  ask (perceive-robots-in-cone color towards r) [
+    if(owner != self) [
+      set b true
+      stop
+    ]
+  ] 
+  report b
+end
+
+to Green-team-move-to-pos [ x y ] 
+  set heading towardsxy x y
+  ifelse (free-ahead? speed = nobody) [
+    forward-move 1
+  ][
+    rt 180
+  ]
+end
+
+to Green-team-move-to-robot [ r ] 
+  Green-team-move-to-pos [xcor] of r [ycor] of r
+end
+
+to Green-team-set-closest-ennemy
+  let ce min-one-of perceive-robots ennemy [ distance myself ]
+  ifelse(ce != nobody and not Green-team-ally-toward-ennemy ce) [ 
+    set mem0 ce
+  ][
+    let be min-one-of perceive-base ennemy [ distance myself ]
+    ifelse(be != nobody and not Green-team-ally-toward-ennemy be) [ 
+      set mem0 be
+    ][
+      set mem0 nobody 
+    ]
+  ]
+end
+
+
+to Green-team-reload
+  if(energy > 500) [
+    if(nb-fafs < 5) [new-faf 1]
+    if (nb-missiles < 5) [ new-missile 1 ]
+  ]
+end
+
+
+to Green-team-shoot
+  let ce mem0
+  if(ce != nobody) [ 
+    if([breed] of ce = harvesters)[
+      ifelse(distance ce > 4)
+      [launch-faf ce]
+      [launch-rocket towardsxy [xcor] of ce [ycor] of ce]
+    ]
+    if([breed] of ce = rocketlaunchers)[
+      ifelse(distance ce > 2)
+      [launch-faf ce]
+      [launch-rocket towardsxy [xcor] of ce [ycor] of ce]
+    ]
+    if([breed] of ce = explorers)[
+      ifelse(distance ce > 1)
+      [launch-faf ce]
+      [launch-rocket towardsxy [xcor] of ce [ycor] of ce]
+    ]
+    if([breed] of ce = bases)[
+      launch-rocket towardsxy [xcor] of ce [ycor] of ce
+    ]
+  ]
+end
+
+to Green-team-RocketLauncher-fight
+  let ce mem0
+  if(ce != nobody) [ 
+    if([breed] of ce = harvesters)[
+      ifelse(distance ce > 3)[
+        Green-team-move-to-robot ce
+      ][
+        random-move
+      ]
+    ]
+    if([breed] of ce = rocketlaunchers)[
+      random-move
+    ]
+    if([breed] of ce = explorers)[
+      random-move
+    ]
+    if([breed] of ce = bases)[
+      random-move
+    ]
+  ]
+end
+
+to Green-team-Explorer-search-enemy-base
+  let b min-one-of perceive-base ennemy [ distance myself ]
+  if(b != nobody)[
+    let pos [list xcor ycor] of b
+    Green-team-set-enemy-base pos
+  ]
+end
+
+to Green-team-set-enemy-base [ pos ]
+  ifelse(mem1 = 0)[
+    set mem1 pos
+    if([breed] of self = explorers)[ set mem5 2 ]
+  ][if(mem2 = 0)[
+    if(mem1 != pos)[
+      set mem2 pos
+      if([breed] of self = explorers)[ set mem5 2 ]
+    ]
+  ]]
+end
+
+to Green-team-report-enemy-base
+  let b 0
+  ifelse(mem5 = 3) [
+    set b min-one-of my-bases [ distance myself ]
+  ][ ifelse(mem5 = 2) [
+    set b first sort my-bases
+  ][
+    set b last sort my-bases
+  ]]
+  
+  ifelse(distance b <= 2) [
+    Green-team-return-to-base
+  ][
+    Green-team-goto-base b
+  ]
+end
+
+to Green-team-goto-base [ b ]
+  set heading towards b - 20 + random 40
+  ifelse (free-ahead? speed = nobody)  [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+end
+
+to Green-team-goto-enemy-base
+  let b 0;
+  ifelse (Green-team-all-enemy-base-is-know?) [
+    ifelse(distancexy first mem1 last mem1 > distancexy first mem2 last mem2) [
+      set b mem1
+    ][
+     set b mem2 
+    ]
+  ][ if (Green-team-enemy-base-is-know?) [
+    ifelse(mem2 = 0) [
+      set b mem1
+    ][
+     set b mem2 
+    ]
+  ]]
+  
+  if(b != 0)[
+    set heading (towardsxy first b last b) - 20 + random 40
+    ifelse (free-ahead? speed = nobody)  [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+  ]
+end
+
+to Green-team-avoid-enemy-base
+  let b 0;
+  ifelse (Green-team-all-enemy-base-is-know?) [
+    ifelse((distancexy first mem1 last mem1) < (distancexy first mem2 last mem2)) [
+      set b mem1
+    ][
+     set b mem2 
+    ]
+  ][ if (Green-team-enemy-base-is-know?) [
+    ifelse(mem2 = 0) [
+      set b mem1
+    ][
+     set b mem2 
+    ]
+  ]]
+  
+  ifelse(b != 0 and (distancexy first b last b) <= 13)[
+    ;Green-team-return-to-base
+    set heading (towardsxy first b last b)
+    rt 180
+    ifelse (free-ahead? speed = nobody)  [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+  ][
+    
+  ]
+end
+
+to Green-team-ask-for-energy [ b n ]
+  ask b [
+    ifelse (energy - n > 1000) [
+      give-energy myself n
+    ][
+      if (energy > 1000) [
+        give-energy myself energy - 1000
+      ]
+    ]
+  ]
+end
+
+to Green-team-ask-for-set-enemy-base [ b ]
+  let pos1 mem1
+  let pos2 mem2
+  ask b [
+    Green-team-set-enemy-base pos1
+    Green-team-set-enemy-base pos2
+  ]
+  
+  ifelse(mem5 = 3) [
+    set mem5 0
+  ][ if(mem5 = 2 or mem5 = 1) [
+    set mem5 mem5 - 1
+  ]]
+end
+
+to Green-team-ask-for-enemy-base [ b ]
+  let pos1 0
+  
+  let pos2 0
+  ask b [
+    set pos1 mem1
+    set pos2 mem2
+  ]
+  
+  set mem1 pos1
+  set mem2 pos2
+end
+
+to Green-team-prepare-attack-base
+  let friends (perceive-specific-robots color rocketlaunchers) with [mem4 = 0]
+  
+  if (count friends >= 7) [
+    let b 0;
+    ifelse (Green-team-all-enemy-base-is-know?) [
+      ifelse(distancexy first mem1 last mem1 > distancexy first mem2 last mem2) [
+        set b mem1
+      ][
+        set b mem2 
+      ]
+      ][ if (Green-team-enemy-base-is-know?) [
+        ifelse(mem2 = 0) [
+          set b mem1
+        ][
+          set b mem2 
+        ]
+    ]]
+  
+    if (b != 0) [
+      ask friends [
+        set mem4 1
+        set mem3 list first b last b 
+      ]
+    ]
+  ]
+end
+
+to Green-team-attack-base
+  ifelse(mem3 != 0) [ 
+    ifelse(distancexy (first mem3) (last mem3) >= 10)[
+      Green-team-move-to-pos (first mem3) (last mem3)
+    ][  
+      ;let b perceive-base ennemy
+      launch-rocket towardsxy (first mem3) (last mem3)
+      random-move
+      
+      if(distancexy (first mem3) (last mem3) < 5)[
+        if(not any? perceive-base ennemy) [
+           set mem4 0
+           set mem3 0 
+        ]
+      ]
+    ]
+  ][
+    set mem4 0
+  ]
+end
+
+to Green-team-return-to-base
+  let b min-one-of my-bases [ distance myself ]
+  
+  ifelse(distance b <= 2) [
+    give-food b carrying-food?
+    
+    if([breed] of self = harvesters)[
+      Green-team-ask-for-energy b harvester-nrj - energy
+      set mem3 0
+      
+    ]
+    if([breed] of self = rocketlaunchers)[
+      Green-team-ask-for-energy b rocket-launcher-nrj - energy
+      Green-team-ask-for-enemy-base b
+    ]
+    if([breed] of self = explorers)[
+      Green-team-ask-for-energy b explorer-nrj - energy
+      Green-team-ask-for-set-enemy-base b
+      Green-team-ask-for-enemy-base b
+    ]
+    
+    rt 180
+  ][
+    Green-team-goto-base b
+  ]
+end
+
+to Green-team-harvesters-go-and-eat
+  let w min-one-of (perceive-walls) [distance myself]
+  let b min-one-of my-bases [ distance myself ]
+  if ((w != nobody) and ((distance b < 10) or (distance b > 11))) [take-wall w]
+  let f min-one-of perceive-food [ distance myself ]
+  ifelse (f != nobody) [ 
+    ifelse (distance f) <= 2
+      [ take-food f ]
+      [ set heading towards f - 20 + random 40
+      ifelse (free-ahead? speed = nobody) [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+      ]
+  ]
+  [
+    ifelse (mem5 = 1)
+    [ 
+      ifelse (distancexy mem0 mem1 > 1)
+      [
+        set heading towardsxy mem0 mem1
+        ifelse (free-ahead? speed = nobody) [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+      ]
+      [ set mem5 0 ]
+    ]
+    [ random-move ]
+  ]
+end
+
+to Green-team-harvester-harvest
+  let f min-one-of perceive-food [ distance myself ]
+  if (f != nobody) [ 
+    ifelse (distance f) <= 2
+      [ take-food f ]
+      [ set heading towards f - 20 + random 40
+      ifelse (free-ahead? speed = nobody) [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+      ]
+  ]
+end
+
+to Green-team-find-harvestable-pos
+  ifelse(mem3 = 0) [
+    set mem3 1;
+  ][ ifelse(mem3 = 1) [
+      Green-team-return-to-base
+  ][ ifelse (mem3 = 2) [
+    ;ifelse (([xcor] of self) = (item 0 mem2) and ([ycor] of self) = (item 1 mem2)) [
+     ifelse (distancexy (item 0 mem2) (item 1 mem2) < 0.5) [
+      plant-seeds color max-seeds
+      set mem3 0
+    ][
+      ;Green-team-move-to-pos item 0 mem2 item 1 mem2
+      ;set label closestPos
+          
+      set heading towardsxy (item 0 mem2) (item 1 mem2)
+      ifelse (free-ahead? speed = nobody) [
+        forward-move 1
+      ][
+         rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]
+      ]
+    ]
+  ][ ifelse (mem3 = 3) [
+    let rand random 100
+    ifelse(rand < 10) [
+      set mem3 4
+    ][
+      set mem3 5    
+    ]
+  ][ ifelse (mem3 = 4) [
+    let b min-one-of my-bases [ distance myself ]
+    ifelse (distance b < 10) [
+       set heading towards b
+       rt 180
+       ifelse (free-ahead? speed = nobody)  [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
+    ][ ifelse (distance b < 15) [
+       plant-seeds color max-seeds
+       random-move
+    ][
+       set mem3 5
+    ]]
+  ][ ifelse (mem3 = 5) [  
+       Green-team-return-to-base    
+  ][ if (mem3 = 6 ) [
+       random-move              
+  ]]]]]]]
+end
+
+to Green-team-base-give-harvestable-pos [ r ]
+  let closestPos 0
+  let closestDist 0
+  
+  let b self
+  
+  ;;algo
+  ;let x [xcor] of self - 10
+  ;while [x <= [xcor] of self + 10][
+    ;let y [ycor] of self - 10
+    ;while [y <= [ycor] of self + 10][
+      ;if(x != [xcor] of self or y != [ycor] of self) [
+        ;;on recherche que dans la zone de perception de la base
+        ;if(distancexy x y < 10)[
+          ;let isSeeded false
+          ;ask perceive-seeds color [
+            ;if([xcor] of self = x and [ycor] of self = y) [set isSeeded true]
+          ;]
+          
+          ;set isSeeded any? (perceive-seeds color) with [[xcor] of self = x and [ycor] of self = y]
+          
+          ;let isSeeded (count (Seeds-at x y) != 0)
+          
+          ;if (isSeeded) [print any? (Seeds-on (patch-at x y))]
+          
+          ;if(not isSeeded) [
+            ;let dist 0
+            ;ask r [ set dist distancexy x y]
+            
+            ;if(closestPos = 0 or dist < closestDist) [
+              ;set closestPos list x y
+              ;set closestDist dist
+            ;]
+          ;]
+        ;]
+      ;]
+      
+      ;set y y + 1
+    ;]
+    ;set x x + 1
+  ;]
+  
+  let closestFreePatch min-one-of (patches in-radius detection-range with [ not any? Seeds-here and (pxcor != [xcor] of b or pycor != [ycor] of b)]) [ distance r ]
+    
+  ask r [
+    ;set mem2 closestPos
+    set mem2 list ([pxcor] of closestFreePatch) ([pycor] of closestFreePatch)
+    set mem3 2
+  ]
+end
+
+to Green-team-base-assign-harvestable-pos
+  let nbseed count perceive-seeds color
+  
+  let valid-asker-list [self] of ((perceive-specific-robots color harvesters) with [mem3 = 1 and nbseed * 0.8 < carrying-food?])
+  let invalid-asker-list (perceive-specific-robots color harvesters) with [mem3 = 1 and not (nbseed * 0.8 < carrying-food?)]
+  foreach(valid-asker-list) [ r -> Green-team-base-give-harvestable-pos r ]
+  ask invalid-asker-list [ set mem3 3 ]
+end
+
+;to Green-team-harvester-take-food
+  ;let f min-one-of perceive-food [ distance myself ]
+  ;while [(f != nobody) and (distance f <= 2)] [
+    ;take-food f
+    ;set f min-one-of perceive-food [ distance myself ]
+  ;]
+;end
+
+to goGreenExplorer
+  Green-team-set-closest-ennemy
+  Green-team-prepare-attack-base
+  Green-team-avoid-enemy-base
+  
+  if(not Green-team-all-enemy-base-is-know?) [
+    set label "search_enemy_base"
+    Green-team-Explorer-search-enemy-base
+  ] 
+  
+  ifelse (Green-team-should-report-to-base?) [
+      set label "report_to_base"
+      Green-team-report-enemy-base
+  ][ifelse (Green-team-should-return-to-base?) [
+    set label "return_base";
+    Green-team-return-to-base
+  ][ifelse (Green-team-enemy-close?) [
+    set label "flee";
+    ;TODO
+    random-move
+  ][
+    random-move
+  ]]]
+end
+
+to goGreenRocketLauncher
+  ifelse (Green-team-ready-to-attack-base?) [
+    Green-team-attack-base
+    set label "attack_base"
+    ;print "attack"
+  ][
+    Green-team-set-closest-ennemy
+    Green-team-reload
+    Green-team-shoot
+    ;Green-team-avoid-enemy-base
+  
+    ifelse (Green-team-should-report-to-base?) [
+      set label "report_to_base"
+      Green-team-report-enemy-base
+    ][ ifelse (Green-team-should-return-to-base?) [
+      set label "return_base"
+      Green-team-return-to-base
+    ][ ifelse (Green-team-enemy-close?) [
+      set label "fight"
+      Green-team-RocketLauncher-fight
+    ][ifelse (Green-team-enemy-base-is-know?) [
+      ifelse (Green-team-enemy-base-closest-dist? < 20) [
+        set label "scout_enemy_base"
+        random-move   
+      ][
+        set label "goto_enemy_base"
+        Green-team-goto-enemy-base
+      ]
+    ][
+      random-move
+    ]]]]
+  ]
+end
+
+to goGreenHarvester
+  ;let f min-one-of perceive-food [ distance myself ]
+  ;while [(f != nobody) and (distance f <= 2)] [
+    ;take-food f
+    ;set f min-one-of perceive-food [ distance myself ]
+  ;]
+  
+
+  ;ifelse (mem4 = 1) or (carrying-food? > 500) or (energy < 100)
+  ;[
+    ; retour à la base
+    ;set mem4 1
+    ;; rentre à la base si certaines conditions sont vérifiées
+    ;Green-team-go-back-to-base
+    ;if (energy > 100) and (carrying-food? > 100) [ 
+      ;; détermine la distance de la base la plus proche
+      ;let b min-one-of my-bases [ distance myself ]
+      ;if (b != nobody) [
+        ;; si le robot est à moins de 10 de la base
+        ;if (distance b < 10)
+          ;[ plant-seeds color max-seeds ]
+      ;]
+    ;]
+  ;]
+  ;[
+    ;; cherche à manger
+    ;Green-team-harvesters-go-and-eat
+    
+    ;Green-team-find-harvestable-pos
+  ;]
+  
+  let w min-one-of (perceive-walls) [distance myself]
+  let b min-one-of my-bases [ distance myself ]
+  if (w != nobody and distance b < 10) [take-wall w]
+  if (distance b > 11) [drop-wall]
+  
+  ifelse (Green-team-should-return-to-base? ) [
+    set label "return_base"
+    Green-team-return-to-base
+  ][ ifelse (Green-team-should-harvest?) [
+    set label "harvest"
+    Green-team-harvester-harvest
+  ][ ifelse (Green-team-should-plant?) [
+    set label "plant"
+    Green-team-find-harvestable-pos
+  ][ifelse (Green-team-have-burger?) [
+    set label "deliver_base"
+    Green-team-return-to-base
+  ][
+    random-move
+  ]]]]
+end
+
+to goGreenBase
+  ifelse (mem6 > 0) [ new-Harvester self set mem6 mem6 - 1 ]
+  [ ifelse (mem7 > 0) [ new-RocketLauncher self set mem7 mem7 - 1 ]
+  [ ifelse (mem8 > 0) [ new-Explorer self set mem8 mem8 - 1 ]
+      
+  [ if (energy > 10000) [
+  ;[ if (energy > 1000000000000000) [
+      let p random-float 1
+      let f 0.1
+      ifelse (p <= f) [ 
+          set mem6 mem6 + 1 
+      ][
+          set f f + 0.8
+          ifelse (p <= f) [ 
+            set mem7 mem7 + 1 
+          ][
+            set mem8 mem8 + 1 
+          ]
+      ]
+  ]]]]
+  
+  if(energy > 1000) [
+    Green-team-set-closest-ennemy
+    Green-team-reload
+    Green-team-shoot
+  ]
+  
+  ;let h-list sort perceive-specific-robots color harvesters
+  ;foreach(h-list) [ r ->
+    ;let search false;
+    ;ask r [
+      ;if(mem3 = 1) [
+        ;ifelse(nbseed * 0.8 < carrying-food?) [
+          ;set search true
+        ;][
+          ;set mem3 3
+        ;]
+      ;]
+    ;]
+    ;if(search) [
+      ;Green-team-base-give-harvestable-pos r
+    ;]
+  ;]
+  
+  Green-team-base-assign-harvestable-pos
+  
+end
+
+;; procedure pour initialiser les explorers rouges
+to initGreenExplorer
+  set mem5 3
+end
+
+;; procedure pour initialiser les rocket-launchers rouges
+to initGreenRocketLauncher
+  set mem5 3
+end
+
+;; procedure pour initialiser les rocket-launchers rouges
+to initGreenHarvester
+end
+
+;; procedure pour initialiser les bases rouges
+to initGreenBase
+  ;let test [1 2 3]
+  ;let truc 0
+  ;foreach test [
+    ;set truc truc + 1
+  ;]
+  ;set label truc
+  
+  set mem6 15
+  set mem7 0
+  set mem8 1
+end
