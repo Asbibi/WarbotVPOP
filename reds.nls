@@ -467,8 +467,10 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       VPOP-go-toward VPOP-closest-base
       let bs min-one-of perceive-specific-robots color bases [distance myself]
       if (bs != nobody)[
+        let coordBaseDestroyed mem1
         set mem1 [-1 -1]
         ask bs [set mem1 [-1 -1]] 
+        ask bs [set mem2 coordBaseDestroyed] 
         set mem5 [0 0]; Retour à l'exploration normale   
       ]
   ])  
