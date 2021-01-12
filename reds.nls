@@ -376,7 +376,7 @@ end
 
 
 to goRedRocketLauncher
-  ifelse (energy < 1000) or (mem3 = -1)
+  ifelse (energy < 1000)
   [
     ifelse (distance VPOP-closest-base > 2)
     [VPOP-go-toward VPOP-closest-base
@@ -452,7 +452,7 @@ to VPOP-select-target-fire-and-chase
   
 end 
 
-to goRedHarvester
+to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, mem2 = timer récolte, mem3 = timer plantation, mem4 = limite de burger à ne pas planter, mem5[0] = etat du robot, mem5[1] = sous-etat du robot
   ;;red-team-go-back-to-base
   ;;red-team-harvesters-go-and-eat
   
@@ -497,15 +497,22 @@ to goRedHarvester
             set mem2 30
           ]
           ;;Se dirige vers un autre burger et recupere tout les burgers a portée
-          if (burgerPerceived != nobody)[ 
-            VPOP-go-toward burgerPerceived
-            while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
-              take-food burgerPerceived
-              set burgerPerceived min-one-of perceive-food [ distance myself ]
-              set mem2 30
-          ]]
           
-          random-move
+;          if (burgerPerceived != nobody)[ 
+;            VPOP-go-toward burgerPerceived
+;            while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
+;              take-food burgerPerceived
+;              set burgerPerceived min-one-of perceive-food [ distance myself ]
+;              set mem2 30
+;          ]]
+;          
+;          random-move
+          ifelse (burgerPerceived != nobody)[
+            VPOP-go-toward burgerPerceived
+          ][
+            random-move
+          ]
+          
           set mem2 (mem2 - 1)
           if (mem2 < 0 or carrying-food? > 15000)[
             set mem5 [1 0]
@@ -527,8 +534,11 @@ to goRedHarvester
       ]
       
       let closest-base VPOP-closest-base
-      if (distance closest-base < 8 or (distance closest-base < 15 and distance closest-base > 11)) [
-        VPOP-ask-for-energy 1700
+      ifelse (distance closest-base < 8 or (distance closest-base < 15 and distance closest-base > 11)) [
+        if (energy < 500)[          
+          VPOP-ask-for-energy 1700
+        ]
+        
         ; compte le nombre de graine ici
         let nb-seeds count Seeds-here
         ifelse (nb-seeds > 0)[
@@ -548,18 +558,22 @@ to goRedHarvester
           ] 
           VPOP-go-toward closest-base
         ]
+        
+        ifelse (carrying-food? > 0) [
+          let basePerceived one-of perceive-specific-robots color bases
+          if (basePerceived != nobody) [
+            give-food basePerceived carrying-food?
+          ]
+        ][
+          set mem5 replace-item 0 mem5 0
+        ] 
+        
+      ][
+        VPOP-go-toward closest-base
       ]
       
-      VPOP-go-toward closest-base
-      if (carrying-food? > 0) [
-        let basePerceived one-of perceive-specific-robots color bases
-        if (basePerceived != nobody) [
-          give-food basePerceived carrying-food?
-        ]
-      ] 
-      if (carrying-food? < 1)[
-        set mem5 replace-item 0 mem5 0
-      ]  
+      
+      
   ])
   
   
@@ -719,8 +733,6 @@ end
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
   set mem1 -2; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
-  set mem3 0 ;retour a la base après attaque
-  set mem5 -1; Cible
 end
 
 ;; procedure pour initialiser les harvesters rouges
