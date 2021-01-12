@@ -709,18 +709,18 @@ to goRedBase
   
   ;;Production des robots
   ;;SI la base a suffisament d'energie ET qu'elle detecte au moins un rocket launcher a proximité,
-  ;;la base produit 7 harvester, puis 1 explorer puis (1 rocket launcher si on n'a pas detecté de base ennemie ou 7 rockets launcher si on a detecté une base ennemie)
+  ;;la base produit 7 harvester, puis (1 explorer et 1 rocket launcher si on n'a pas detecté de base ennemie) ou (3 explorer et 7 rockets launcher si on a detecté une base ennemie)
   ;;SINON elle produit un rocketlauncher et le force en mode defense
   if (mem6 > 0) and (energy > 15000) [
     ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
       let increase-rl-production 0
-      if (mem1 != -1)[set increase-rl-production 7]
+      if (mem1 != -1) or (mem2 != -1)[set increase-rl-production 1]
       (ifelse
         mem7 < 7 [;; Produit 7 harvester
-          if(count perceive-specific-robots color harvesters < 20)[;;Sauf si il y a 20 harvester proche (des bouchons aux alentours)
+          if(count perceive-specific-robots color harvesters < 20)[;;Sauf si il y a 20 harvesters proche (des bouchons aux alentours)
             new-Harvester self
         ]]
-        mem7 = 7[;;Produit 1 explorer
+        mem7 < 2 * increase-rl-production + 8[;;Produit 1 explorer à 3 explorers
           if(count perceive-specific-robots color explorers < 7)[;;Sauf si il y a 7 explorer
             new-Explorer self
             set mem4 mem4 + 1
@@ -728,10 +728,10 @@ to goRedBase
               ask one-of perceive-specific-robots color explorers [set mem5 [0 1]]
               set mem4 0
         ]]]
-        mem7 < 8 + increase-rl-production[;;Produit 1 à 7 rocket launchers
+        mem7 < 8 + 8 * increase-rl-production[;;Produit 1 à 7 rocket launchers
           new-RocketLauncher self
         ]
-        mem7 = 8 + increase-rl-production[;;Dernier rocket launcher du cycle      
+        mem7 = 8 + 8 * increase-rl-production[;;Dernier rocket launcher du cycle      
           new-RocketLauncher self
           set mem6 mem6 - 1
           set mem7 -1 ])
