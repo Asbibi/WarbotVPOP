@@ -5,10 +5,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-globals[ration1n2]
-
-
-
 
 
 
@@ -675,7 +671,7 @@ to goRedBase
   if (mem6 > 0) and (energy > 15000) [
     ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
       let increase-rl-production 0
-      if (mem1 != -1)[set increase-rl-production 0]
+      if (mem1 != -1)[set increase-rl-production 7]
       (ifelse
         mem7 < mem3 [;; nombre de harvester par RL/explo
           if(count perceive-specific-robots color harvesters < 20)[
@@ -683,8 +679,12 @@ to goRedBase
         ]]
         mem7 = mem3[  
           if(count perceive-specific-robots color explorers < 7)[
-            new-Explorer self
-        ]]
+                        new-Explorer self
+            set mem4 mem4 + 1
+            if (mem4 > 3)[
+              ask one-of perceive-specific-robots color explorers [set mem5 [0 1]]
+              set mem4 0
+        ]]]
         mem7 < mem3 + 1 + increase-rl-production[      
           new-RocketLauncher self
         ]
@@ -758,11 +758,10 @@ end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
-  if (ration1n2 = 0)[set ration1n2 2]
   set mem0 [-1 -1] ;coordonées d'un tas
   set mem1 -1 ;coordonées de la base ennemie
   set mem2 -1;;coordonées de la base ennemie detruite
-  set mem3 ration1n2;
+  set mem3 7;
   set mem6 99 ;nombre d'harvesters a produire ? a suprimer
   set mem7 0 ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
 end
