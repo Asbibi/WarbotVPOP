@@ -453,7 +453,6 @@ to goRedRocketLauncher                ;mem1 : coord de la base à attaquer ou -1
   [
     ifelse (distance VPOP-closest-base > 2)[
       VPOP-go-toward VPOP-closest-base
-      set mem1 -1
     ][
       VPOP-ask-for-energy 4000 - energy
     ]
@@ -770,7 +769,7 @@ end
 
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
-  set mem1 -2       ; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
+  set mem1 -1       ; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
 end
 
 ;; procedure pour initialiser les harvesters rouges
