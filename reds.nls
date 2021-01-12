@@ -448,7 +448,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
 end
 
 to goRedRocketLauncher                ;mem1 : coord de la base à attaquer ou -1 s'il n'y a pas de base à attaquer ou -2 si le rocket launcherdoit toujours rester défendre la base
-  ;Si on a besoin d'énergie on va en chercher
+                                      ;Si on a besoin d'énergie on va en chercher
   ifelse (energy < 1000)
   [
     ifelse (distance VPOP-closest-base > 2)[
@@ -646,9 +646,9 @@ to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, me
 end
 
 to goRedBase
-  ;set label energy
   
-  ;;Transmet l'info de tas à un harvester
+  ;;Si la base a reçu les coordonées d'un amas de burger, elle les transmet à un harvester
+  ;;Si la base ne trouve pas d'harvester, elle en créé un et lui transmet les coordonées
   let infoTas mem0
   if (infoTas != [-1 -1])[
     let t one-of perceive-specific-robots color harvesters
@@ -664,7 +664,8 @@ to goRedBase
     ]
   ]
   
-  ;;Detecte les tas et transmet l'info
+  ;;La base cherche un amas de burger si elle en trouve un, elle transmet les coordonées à un harvester
+  ;;Si la base ne trouve pas d'harvester, elle en créé un et lui transmet les coordonées
   if (count perceive-food > 10)[
     let burgerPerceived one-of perceive-food
     let burgerPerceivedxy [-1 -1]
@@ -683,10 +684,9 @@ to goRedBase
     ]
   ]
   
-  ;;Transmet l'info de base ennemie aux RL
+  ;;Si la base a reçu les coordonées d'une base ennemi en vie, elle les transmet à tout les rocket launcher en attente d'ordre
   let infoBase mem1
   if (infoBase != -1)[
-    ;set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
     let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
     set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
     let RocketLauncherPerceived one-of RocketLaunchersPerceived
@@ -701,33 +701,36 @@ to goRedBase
   
   
   
-  ;;Créé les robots 1 par 1
+  ;;Production des robots
+  ;;SI la base a suffisament d'energie ET qu'elle detecte au moins un rocket launcher a proximité,
+  ;;la base produit 7 harvester, puis 1 explorer puis (1 rocket launcher si on n'a pas detecté de base ennemie ou 7 rockets launcher si on a detecté une base ennemie)
+  ;;SINON elle produit un rocketlauncher et le force en mode defense
   if (mem6 > 0) and (energy > 15000) [
     ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
       let increase-rl-production 0
       if (mem1 != -1)[set increase-rl-production 7]
       (ifelse
-        mem7 < mem3 [;; nombre de harvester par RL/explo
-          if(count perceive-specific-robots color harvesters < 20)[
+        mem7 < 7 [;; Produit 7 harvester
+          if(count perceive-specific-robots color harvesters < 20)[;;Sauf si il y a 20 harvester proche (des bouchons aux alentours)
             new-Harvester self
         ]]
-        mem7 = mem3[  
-          if(count perceive-specific-robots color explorers < 7)[
-                        new-Explorer self
+        mem7 = 7[;;Produit 1 explorer
+          if(count perceive-specific-robots color explorers < 7)[;;Sauf si il y a 7 explorer
+            new-Explorer self
             set mem4 mem4 + 1
             if (mem4 > 3)[
               ask one-of perceive-specific-robots color explorers [set mem5 [0 1]]
               set mem4 0
         ]]]
-        mem7 < mem3 + 1 + increase-rl-production[      
+        mem7 < 8 + increase-rl-production[;;Produit 1 à 7 rocket launchers
           new-RocketLauncher self
         ]
-        mem7 = mem3 + 1 + increase-rl-production[;dernier RL du cycle      
+        mem7 = 8 + increase-rl-production[;;Dernier rocket launcher du cycle      
           new-RocketLauncher self
           set mem6 mem6 - 1
           set mem7 -1 ])
-      set mem7 mem7 + 1 ]
-    [;Si il n'y a pas de RL en defense, on en créé un qui restera en def
+      set mem7 mem7 + 1 ] ;;On incrémente le compteur: on passe à l'étape suivante du cycle
+    [;;Si il n'y a pas de RL en defense, on en créé un qui restera en def
       new-RocketLauncher self
       ask one-of perceive-specific-robots color rocketlaunchers [set mem1 -2]]
   ]
@@ -737,15 +740,16 @@ to goRedBase
   if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
   
   
-  ;;Tire sur les ennemis proches
+  ;;Methode de tir sur les ennemis proches
   let tries 0
+  ;;La base tente de detecter un ennemi
   let t one-of perceive-robots ennemy
   while[tries < 10 and t != nobody][
-    ;; regarde s'il y a des alliés en direction de la cible potentielle t avant de tirer
+    ;;La base regarde s'il y a des alliés en direction de la cible potentielle t avant de tirer
     ifelse (not any? perceive-robots-in-cone color towards t) [ 
       launch-faf t 
       set tries 10
-    ]
+    ];;La base tire si l'allié detecté est derrière l'ennemi visé
     [if (distance min-one-of perceive-robots-in-cone color towards t [distance myself] > distance t)[
       launch-faf t
       set tries 10
@@ -763,7 +767,7 @@ to initRedExplorer
   set mem1 [-1 -1]  ; emplacement des coordonnées de la base ennemie trouvée ou espionnée
   set mem2 -1       ; reference de l'harvester à aider
   set mem3 -1       ; timer de check spy et timer de stop-spy
-  ;mem4             ; timer d'aide spy et coordonnées de la seconde base à laquelle il faut reporter la destruction de l'ennemi
+                    ;mem4             ; timer d'aide spy et coordonnées de la seconde base à laquelle il faut reporter la destruction de l'ennemi
   set mem5 [0 0]    ; état [0] et priorité [1] de l'explorer
 end
 
@@ -776,9 +780,9 @@ end
 to initRedHarvester
   ;mem0             ; permet d'exposer carrying-food?
   set mem1 [-1 -1]  ; coordonnées du tas à récupérer
-  ;mem2             ; timer de récolte
-  ;mem3             ; timer de plantation
-  ;mem4             ; limite de burger à garder pour la base lorsqu'on plante
+                    ;mem2             ; timer de récolte
+                    ;mem3             ; timer de plantation
+                    ;mem4             ; limite de burger à garder pour la base lorsqu'on plante
   set mem5 [0 0]
 end
 
@@ -787,7 +791,6 @@ to initRedBase
   set mem0 [-1 -1]  ;coordonées d'un tas
   set mem1 -1       ;coordonées de la base ennemie
   set mem2 -1       ;coordonées de la base ennemie detruite
-  set mem3 7
-  set mem6 99       ;nombre d'harvesters a produire ? a suprimer
-  set mem7 0        ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
+  set mem6 9999       ;nombre maximal de cycle a produire
+  set mem7 0        ;ordre de production des robots (0-6 -> Harvester; 7 -> Explorer; 7+ -> RocketLauncher)
 end
