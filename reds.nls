@@ -71,7 +71,9 @@ to VPOP-chaaarge
   
   ;;Tourne autour de la base en tirant
   set heading towardsxy item 0 eBase item 1 eBase
-  if (VPOP-has-arrived eBase 10)[
+  ; on les place à 11 de la base adverse comme ça ils sont hors de son champs de vision mais les missiles des
+  ; rocket launchers atteignent tout de même la base
+  if (VPOP-has-arrived eBase 11)[
     launch-rocket towardsxy item 0 eBase item 1 eBase
     rt 90]
   if (VPOP-has-arrived eBase 5)[
@@ -402,12 +404,13 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
         
         ;On part prévenir la seconde base
         let be max-one-of my-bases [ distance myself ]
+        show be
         ; Si l'autre base existe toujours
-        ifelse (be != nobody and be != bs)[
+        ifelse (be != nobody)[
           set mem4 [-1 -1] ;on change mem4 de nombre à liste
           set mem4 replace-item 0 mem4 [xcor] of be
           set mem4 replace-item 1 mem4 [ycor] of be
-          set mem5 replace-item 0 mem5 7  
+          set mem5 replace-item 0 mem5 8  
         ][
           ;l'explorer oublie la base adverse et repart en search
           set mem1 [-1 -1]
@@ -419,23 +422,26 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       ;SEC-REP-SPY : On va à la seconde base pour également la prévenir qu'une base ennemie est morte
       
       VPOP-go-towardxy mem4
-      let bs min-one-of perceive-specific-robots color bases [distance myself]
-      (ifelse 
-        bs != nobody[
-          ; On préviens la première base que l'ennemi est détruit
-          let coordBaseDestroyed mem1
-          ask bs [VPOP-report-dead-ennemy-base coordBaseDestroyed] 
-          
-          ;l'explorer oublie la base adverse et repart en search
-          set mem1 [-1 -1]
-          set mem4 0 ; mem4 redevient un nombre
-          set mem5 replace-item 0 mem5 0   
-        ]
-        VPOP-has-arrived mem1 3[          ;l'explorer aurait dû avoir vu la base allié : elle est surement morte entre temps...
-          set mem1 [-1 -1]
-          set mem4 0 ; mem4 redevient un nombre
-          set mem5 replace-item 0 mem5 0 
-      ])
+      ;On ne vérifies pas tout de suite car on percoit encore la première base
+      if (VPOP-has-arrived mem4 9)[
+        let bs min-one-of perceive-specific-robots color bases [distance myself]
+        (ifelse 
+          bs != nobody[
+            ; On préviens la première base que l'ennemi est détruit
+            let coordBaseDestroyed mem1
+            ask bs [VPOP-report-dead-ennemy-base coordBaseDestroyed] 
+            
+            ;l'explorer oublie la base adverse et repart en search
+            set mem1 [-1 -1]
+            set mem4 0 ; mem4 redevient un nombre
+            set mem5 replace-item 0 mem5 0   
+          ]
+          VPOP-has-arrived mem4 3[          ;l'explorer aurait dû avoir vu la base allié : elle est surement morte entre temps...
+            set mem1 [-1 -1]
+            set mem4 0 ; mem4 redevient un nombre
+            set mem5 replace-item 0 mem5 0 
+        ])
+      ]
   ])  
   
   ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
