@@ -7,117 +7,6 @@
 
 globals[ration1n2]
 
-to red-team-go-back-to-base
-  if (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  [
-    let b min-one-of my-bases [ distance myself ]
-    if (b != nobody) [
-      ifelse (distance b <= 2)
-      [ 
-        if (carrying-food? > 1000) [ give-food b carrying-food? ]
-        ;if (energy < 500) [ red-team-ask-for-energy b 500 ]
-        if ((Breed = RocketLaunchers) and (nb-missiles = 0)) [
-          VPOP-ask-for-energy 500
-          new-missile 5
-        ]
-      ]
-      [
-        set heading   b - 20 + random 40
-        if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
-        forward-move speed
-      ]
-    ]    
-  ]
-end
-
-to red-team-go-and-eat
-  if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) [
-    random-move
-  ]
-end
-
-to red-team-harvesters-go-and-eat
-  let b min-one-of perceive-food [ distance self ]
-  ifelse (b != nobody) [ 
-    ifelse (distance b) <= 2
-      [ take-food b ]
-    [ set heading towards b - 20 + random 40
-      if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
-      forward-move speed
-    ]
-  ]
-  [ random-move ]
-end
-
-to-report red-team-no-target?
-  report mem5 = 0
-end
-
-to red-team-set-target [ x y espece ]
-  set mem0 x set mem1 y set mem2 espece set mem5 1
-end
-
-to red-team-call-rocket-launcher [ x y espece ]
-  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ red-team-set-target x y espece ]]
-end
-
-to red-team-call-explorer [ x y espece ]
-  let ex one-of perceive-specific-robots color Explorers
-  if (ex != nobody) [
-    ask ex [
-      set mem0 x 
-      set mem1 y
-      set mem2 espece
-      set mem5 1
-    ]
-  ]
-end
-
-
-to red-team-select-target
-  if (red-team-no-target?)
-  [
-    let h min-one-of perceive-robots ennemy [ distance myself ]
-    ifelse ( h != nobody ) [
-      set mem0 [xcor] of h
-      set mem1 [ycor] of h
-      set mem2 [breed] of h
-      set mem5 1
-    ]
-    [ set mem5 0 ]
-  ]
-end
-
-to red-team-shoot 
-  if (not red-team-no-target?) 
-  [
-    ifelse (distancexy mem0 mem1 < detection-range)
-    [ launch-rocket towardsxy mem0 mem1 set mem5 0]
-    [ set heading towardsxy mem0 mem1 - 20 + random 40
-      if count turtles in-cone 2 90 with [ (breed != Burgers) and (breed != Perceptions) ] != 1 [ rt random 90 ]
-      forward-move speed
-    ]
-  ]
-  
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -504,6 +393,19 @@ to goRedRocketLauncher
     ]
   ]
   
+  ;;Si il croise un ennemi et qu'il n'a pas tiré, tire dessus (sans engager la poursuite)
+  let t min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Cherche d'abord les RL ennemis (le plus proche)
+  if (t != nobody)[
+    launch-faf t ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy ([xcor] of t) ([ycor] of t);;sinon on tire un missile
+  ]
+  
+  let h min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Puis l'ennemi le plus proche)
+  if (h != nobody)[
+    launch-faf h ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy ([xcor] of h) ([ycor] of h);;sinon on tire un missile
+  ]
+  
   ;; crée un nouveau missile si plus de 1000 unités d'énergie
   if ((energy > 1000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
@@ -522,11 +424,6 @@ end
 to VPOP-chaaarge
   
   let eBase mem1
-  ;verifie que la base existe encore
-;  if (distance eBase < 5)[
-;    let tBase perceive-base ennemy
-;    if (tBase = nobody)[
-;      set mem3 -1]]
   
   ;;Tourne autour de la base en tirant
   set heading towardsxy item 0 eBase item 1 eBase
@@ -546,6 +443,12 @@ to VPOP-select-target-fire-and-chase
     launch-faf t ;;si on a un faf, on tire un faf
     launch-rocket towardsxy ([xcor] of t) ([ycor] of t);;sinon on tire un missile
     VPOP-go-toward t]
+  
+  let h min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Puis l'ennemi le plus proche)
+  if (h != nobody)[
+    launch-faf h ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy ([xcor] of h) ([ycor] of h);;sinon on tire un missile
+    VPOP-go-toward h]
   
 end 
 
@@ -693,17 +596,38 @@ to goRedBase
     ifelse (t != nobody)[
       ask t [set mem1 infoTas]
       set mem0 [-1 -1]]
-    [if (energy > 5000)[
+    [if (energy > 15000)[
       new-Harvester self
       let t2 one-of perceive-specific-robots color harvesters
       ask t2 [set mem1 infoTas]
       set mem0 [-1 -1]
-  ]]]
+      ]
+    ]
+  ]
+  
+  ;;Detecte les tas et transmet l'info
+  if (count perceive-food > 10)[
+    let burgerPerceived one-of perceive-food
+    let burgerPerceivedxy [-1 -1]
+    set burgerPerceivedxy replace-item 0 burgerPerceivedxy ([xcor] of burgerPerceived)
+    set burgerPerceivedxy replace-item 1 burgerPerceivedxy ([ycor] of burgerPerceived)
+    
+    let t one-of perceive-specific-robots color harvesters
+    ifelse (t != nobody)[
+      ask t [set mem1 burgerPerceivedxy]
+    ]
+    [if (energy > 15000)[
+      new-Harvester self
+      let t2 one-of perceive-specific-robots color harvesters
+      ask t2 [set mem1 burgerPerceivedxy]
+      ]
+    ]
+  ]
   
   ;;Transmet l'info de base ennemie aux RL
   let infoBase mem1
   if (infoBase != -1)[
-    set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
+    ;set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
     let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
     set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
     let RocketLauncherPerceived one-of RocketLaunchersPerceived
@@ -712,7 +636,8 @@ to goRedBase
       set RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
       set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
       set RocketLauncherPerceived one-of RocketLaunchersPerceived
-  ]]
+    ]
+  ]
   
   
   
@@ -721,17 +646,20 @@ to goRedBase
   if (mem6 > 0) and (energy > 15000) [
     ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
       let increase-rl-production 0
-      if (mem1 != -1)[set increase-rl-production 1]
+      if (mem1 != -1)[set increase-rl-production 0]
       (ifelse
-        mem7 < ration1n2 [;; nombre de harvester par RL/explo
+        mem7 < mem3 [;; nombre de harvester par RL/explo
           if(count perceive-specific-robots color harvesters < 20)[
           new-Harvester self
         ]]
-        mem7 = ration1n2[  
+        mem7 = mem3[  
           if(count perceive-specific-robots color explorers < 7)[
           new-Explorer self
         ]]
-        mem7 = ration1n2 + 1[      
+        mem7 < mem3 + 1 + increase-rl-production[      
+          new-RocketLauncher self
+        ]
+        mem7 = mem3 + 1 + increase-rl-production[;dernier RL du cycle      
           new-RocketLauncher self
           set mem6 mem6 - 1
           set mem7 -1 ])
@@ -747,12 +675,22 @@ to goRedBase
   
   
   ;;Tire sur les ennemis proches
+  let tries 0
   let t one-of perceive-robots ennemy
-  if (t != nobody) [
+  while[tries < 10 and t != nobody][
     ;; regarde s'il y a des alliés en direction de la cible potentielle t avant de tirer
-    ifelse (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
-    [if (distance min-one-of perceive-robots-in-cone color towards t [distance myself] > distance t)[launch-faf t]
-  ]]
+    ifelse (not any? perceive-robots-in-cone color towards t) [ 
+      launch-faf t 
+      set tries 10
+    ]
+    [if (distance min-one-of perceive-robots-in-cone color towards t [distance myself] > distance t)[
+      launch-faf t
+      set tries 10
+      ]
+    ]
+    set t one-of perceive-robots ennemy
+    set tries tries + 1
+  ]
   
 end
 
@@ -765,6 +703,7 @@ to VPOP-report-dead-ennemy-base[eBase]
   set mem2 eBase
   if (mem1 = eBase)[
     set mem1 -1
+    set mem3 1
   ]
 end
 
@@ -779,7 +718,7 @@ end
 
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
-  set mem1 -1; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
+  set mem1 -2; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
   set mem3 0 ;retour a la base après attaque
   set mem5 -1; Cible
 end
@@ -796,7 +735,7 @@ to initRedBase
   set mem0 [-1 -1] ;coordonées d'un tas
   set mem1 -1 ;coordonées de la base ennemie
   set mem2 -1;;coordonées de la base ennemie detruite
-  set mem3 2
+  set mem3 ration1n2;
   set mem6 99 ;nombre d'harvesters a produire ? a suprimer
   set mem7 0 ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
 end
