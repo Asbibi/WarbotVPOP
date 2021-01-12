@@ -5,7 +5,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+globals[ration1n2]
 
 to red-team-go-back-to-base
   if (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
@@ -313,7 +313,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
         ]
         let infoBase mem1
         if(infoBase != [-1 -1])[
-          ask basePerceived [set mem1 infoBase]
+          ask basePerceived [VPOP-report-ennemy-base infoBase]
           set mem1 [-1 -1]]
       ]
     ]
@@ -469,8 +469,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
       if (bs != nobody)[
         let coordBaseDestroyed mem1
         set mem1 [-1 -1]
-        ask bs [set mem1 [-1 -1]] 
-        ask bs [set mem2 coordBaseDestroyed] 
+        ask bs [VPOP-report-dead-ennemy-base coordBaseDestroyed] 
         set mem5 [0 0]; Retour à l'exploration normale   
       ]
   ])  
@@ -703,7 +702,7 @@ to goRedBase
   
   ;;Transmet l'info de base ennemie aux RL
   let infoBase mem1
-  if (infoBase != [-1 -1])[
+  if (infoBase != -1)[
     set mem7 3;; !!! Cette ligne force la base a ne produire QUE des RL dès qu'on a les coordonées de la base ennemie (passage en mode attaque) !!!  
     let RocketLaunchersPerceived perceive-specific-robots color rocketlaunchers 
     set RocketLaunchersPerceived RocketLaunchersPerceived with [mem1 = -1]
@@ -718,25 +717,30 @@ to goRedBase
   
   
   
-  ;;Créé les robots 1 par 1
+    ;;Créé les robots 1 par 1
   if (mem6 > 0) and (energy > 15000) [
     ifelse(one-of perceive-specific-robots color rocketlaunchers != nobody)[
+      let increase-rl-production 0
+      if (mem1 != -1)[set increase-rl-production 1]
       (ifelse
-        mem7 < 2 [;; nombre de harvester par RL/explo
+        mem7 < ration1n2 [;; nombre de harvester par RL/explo
+          if(count perceive-specific-robots color harvesters < 20)[
           new-Harvester self
-        ]
-        mem7 = 2 [  
+        ]]
+        mem7 = ration1n2[  
+          if(count perceive-specific-robots color explorers < 7)[
           new-Explorer self
-        ]
-        mem7 = 3 [      
+        ]]
+        mem7 = ration1n2 + 1[      
           new-RocketLauncher self
           set mem6 mem6 - 1
-          set mem7 0 ])
+          set mem7 -1 ])
       set mem7 mem7 + 1 ]
     [;Si il n'y a pas de RL en defense, on en créé un qui restera en def
       new-RocketLauncher self
       ask one-of perceive-specific-robots color rocketlaunchers [set mem1 -2]]
   ]
+  
   
   if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
   if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
@@ -746,9 +750,22 @@ to goRedBase
   let t one-of perceive-robots ennemy
   if (t != nobody) [
     ;; regarde s'il y a des alliés en direction de la cible potentielle t avant de tirer
-    if (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
-  ]
+    ifelse (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
+    [if (distance min-one-of perceive-robots-in-cone color towards t [distance myself] > distance t)[launch-faf t]
+  ]]
   
+end
+
+to VPOP-report-ennemy-base[eBase]
+  if (mem2 != eBase) and (mem1 = -1)[
+    set mem1 eBase]
+end
+
+to VPOP-report-dead-ennemy-base[eBase]
+  set mem2 eBase
+  if (mem1 = eBase)[
+    set mem1 -1
+  ]
 end
 
 ;; procedure pour initialiser les explorers rouges
@@ -775,8 +792,11 @@ end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
+  if (ration1n2 = 0)[set ration1n2 2]
   set mem0 [-1 -1] ;coordonées d'un tas
-  set mem1 [-1 -1] ;coordonées de la base ennemie
+  set mem1 -1 ;coordonées de la base ennemie
+  set mem2 -1;;coordonées de la base ennemie detruite
+  set mem3 2
   set mem6 99 ;nombre d'harvesters a produire ? a suprimer
   set mem7 0 ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
 end

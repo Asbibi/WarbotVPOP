@@ -318,24 +318,24 @@ to Green-team-prepare-attack-base
 end
 
 to Green-team-attack-base
-  ifelse(mem3 != 0) [ 
-    ifelse(distancexy (first mem3) (last mem3) >= 10)[
-      Green-team-move-to-pos (first mem3) (last mem3)
-    ][  
-      ;let b perceive-base ennemy
-      launch-rocket towardsxy (first mem3) (last mem3)
-      random-move
-      
-      if(distancexy (first mem3) (last mem3) < 5)[
-        if(not any? perceive-base ennemy) [
-           set mem4 0
-           set mem3 0 
-        ]
-      ]
-    ]
-  ][
-    set mem4 0
-  ]
+;  ifelse(mem3 != 0) [ 
+;    ifelse(distancexy (first mem3) (last mem3) >= 10)[
+;      Green-team-move-to-pos (first mem3) (last mem3)
+;    ][  
+;      ;let b perceive-base ennemy
+;      launch-rocket towardsxy (first mem3) (last mem3)
+;      random-move
+;      
+;      if(distancexy (first mem3) (last mem3) < 5)[
+;        if(not any? perceive-base ennemy) [
+;           set mem4 0
+;           set mem3 0 
+;        ]
+;      ]
+;    ]
+;  ][
+;    set mem4 0
+;  ]
 end
 
 to Green-team-return-to-base
