@@ -71,7 +71,9 @@ to VPOP-chaaarge
   
   ;;Tourne autour de la base en tirant
   set heading towardsxy item 0 eBase item 1 eBase
-  if (VPOP-has-arrived eBase 10)[
+  ; on les place à 11 de la base adverse comme ça ils sont hors de son champs de vision mais les missiles des
+  ; rocket launchers atteignent tout de même la base
+  if (VPOP-has-arrived eBase 11)[
     launch-rocket towardsxy item 0 eBase item 1 eBase
     rt 90]
   if (VPOP-has-arrived eBase 5)[
