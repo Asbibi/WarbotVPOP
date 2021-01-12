@@ -7,32 +7,37 @@
 
 
 
-
+; Méthode permettant d'aller vers un burger/robot en evitant les obstacles
 to VPOP-go-toward[target-to-go-to]
   set heading towards target-to-go-to
   VPOP-forward-move speed
 end
 
+; Méthode permettant d'aller vers des coordonnées en evitant les obstacles
 to VPOP-go-towardxy[cord-to-go-to]
   set heading towardsxy item 0 cord-to-go-to item 1 cord-to-go-to
   VPOP-forward-move speed
 end
 
-
+; Méthode permettant d'aller tout en droit sauf s'il faut eviter un obstacle
 to VPOP-forward-move[movingSpeed]
+  ; On tente 10 fois de trouver une orientation selon laquelle le déplacement est possible avec une rotation aléatoire, puis on le tente
   let try 0
   while[try < 10 and free-ahead? movingSpeed != nobody][
     rt random 180
     set try try + 1
   ]
-  if (free-ahead? movingSpeed = nobody) [forward-move movingSpeed]
+  ; On vérifies quand même que le déplacement est bien possible au final pour éviter les collisions
+  if (free-ahead? movingSpeed = nobody) [forward-move movingSpeed] 
 end
 
+; Méthode permettant de demander de l'énergie à la base la plus proche
 to VPOP-ask-for-energy [ n ]
   if (n > 0)[
     ask VPOP-closest-base [ if (energy > 6000) [ give-energy myself n ]]]
 end
 
+; Méthode renvoyant si l'agent est à moins de radius des coordonnées (similaire à distance agent <= radius)
 to-report VPOP-has-arrived[targetCoord radius]  
   ifelse (sqrt((xcor - item 0 targetCoord)^ 2 + (ycor - item 1 targetCoord)^ 2) < radius)
   [
@@ -43,10 +48,68 @@ to-report VPOP-has-arrived[targetCoord radius]
   ]
 end
 
+; Méthode renvoyant une référence vers la base la plus proche
 to-report VPOP-closest-base
   report min-one-of my-bases [ distance myself ]
 end
 
+; Méthode donnant les instructions nécessaires à la défense de la base par les rocketLaunchers
+to VPOP-defend  
+  let b min-one-of my-bases [ distance myself ]
+  if (b != nobody) [
+    set heading towards b
+    ;Si on est trop loin de la base à défendre on tourne de 90 afin d'avoir un mouvement circulaire autour de celle-ci ; si on est trop près on s'en éloigne
+    ifelse (distance b < 7)[rt 180]
+    [if (distance b < 9)[rt 90]]
+    VPOP-forward-move speed
+  ]
+end
+
+; Méthode donnant les instructions nécessaires à l'attaque d'une base adverse par les rocketLaunchers
+to VPOP-chaaarge  
+  let eBase mem1
+  
+  ;;Tourne autour de la base en tirant
+  set heading towardsxy item 0 eBase item 1 eBase
+  if (VPOP-has-arrived eBase 10)[
+    launch-rocket towardsxy item 0 eBase item 1 eBase
+    rt 90]
+  if (VPOP-has-arrived eBase 5)[
+    rt 90]
+  VPOP-forward-move speed   
+end
+
+; Méthode permettant de pourchasser et tirer sur le robot ennemi visible le plus proche
+to VPOP-select-target-fire-and-chase
+  ;Cherche d'abord les RL ennemis (le plus proche)
+  let t min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself]
+  if (t != nobody)[
+    launch-faf t ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy ([xcor] of t) ([ycor] of t);;sinon on tire un missile
+    VPOP-go-toward t]
+  
+  ;Puis l'ennemi le plus proche
+  let h min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself]
+  if (h != nobody)[
+    launch-faf h ;;si on a un faf, on tire un faf
+    launch-rocket towardsxy ([xcor] of h) ([ycor] of h);;sinon on tire un missile
+    VPOP-go-toward h]  
+end 
+
+; Méthode permettant aux explorers de report une base ennemi qu'ils ont trouvé
+to VPOP-report-ennemy-base[eBase]
+  if (mem2 != eBase) and (mem1 = -1)[
+    set mem1 eBase]
+end
+
+; Méthode permettant aux explorers de déclaré une base ennemi comme détruite
+to VPOP-report-dead-ennemy-base[eBase]
+  set mem2 eBase
+  if (mem1 = eBase)[
+    set mem1 -1
+    set mem3 1
+  ]
+end
 
 
 
@@ -368,7 +431,7 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
           set mem4 0 ; mem4 redevient un nombre
           set mem5 replace-item 0 mem5 0   
         ]
-        VPOP-has-arrived mem1 <3[          ;l'explorer aurait dû avoir vu la base allié : elle est surement morte entre temps...
+        VPOP-has-arrived mem1 3[          ;l'explorer aurait dû avoir vu la base allié : elle est surement morte entre temps...
           set mem1 [-1 -1]
           set mem4 0 ; mem4 redevient un nombre
           set mem5 replace-item 0 mem5 0 
@@ -384,21 +447,24 @@ to goRedExplorer                      ;mem0 : coord du tas trouvé, mem1 : coord
   ]  
 end
 
-
-
-to goRedRocketLauncher
+to goRedRocketLauncher                ;mem1 : coord de la base à attaquer ou -1 s'il n'y a pas de base à attaquer ou -2 si le rocket launcherdoit toujours rester défendre la base
+  ;Si on a besoin d'énergie on va en chercher
   ifelse (energy < 1000)
   [
-    ifelse (distance VPOP-closest-base > 2)
-    [VPOP-go-toward VPOP-closest-base
-      set mem1 -1]
-    [VPOP-ask-for-energy 4000 - energy]
+    ifelse (distance VPOP-closest-base > 2)[
+      VPOP-go-toward VPOP-closest-base
+      set mem1 -1
+    ][
+      VPOP-ask-for-energy 4000 - energy
+    ]
   ]
   [
+    ; si on a une base à attaquer on va l'attaquer
     ifelse(mem1 != -1) and (mem1 != -2)[
       VPOP-chaaarge
     ]
     [
+      ;sinon on défend la base en pourchassant d'abord les potentiels ennemis visibles
       VPOP-select-target-fire-and-chase
       VPOP-defend
     ]
@@ -409,8 +475,7 @@ to goRedRocketLauncher
   if (t != nobody)[
     launch-faf t ;;si on a un faf, on tire un faf
     launch-rocket towardsxy ([xcor] of t) ([ycor] of t);;sinon on tire un missile
-  ]
-  
+  ]  
   let h min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Puis l'ennemi le plus proche)
   if (h != nobody)[
     launch-faf h ;;si on a un faf, on tire un faf
@@ -421,77 +486,40 @@ to goRedRocketLauncher
   if ((energy > 1000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
-to VPOP-defend
-  
-  let b min-one-of my-bases [ distance myself ]
-  if (b != nobody) [
-    set heading towards b
-    ifelse (distance b < 7)[rt 180]
-    [if (distance b < 9)[rt 90]]
-    VPOP-forward-move speed
-  ]
-end
-
-to VPOP-chaaarge
-  
-  let eBase mem1
-  
-  ;;Tourne autour de la base en tirant
-  set heading towardsxy item 0 eBase item 1 eBase
-  if (VPOP-has-arrived eBase 10)[
-    launch-rocket towardsxy item 0 eBase item 1 eBase
-    rt 90]
-  if (VPOP-has-arrived eBase 5)[rt 90]
-  VPOP-forward-move speed  
-  
-end
-
-
-to VPOP-select-target-fire-and-chase
-  
-  let t min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Cherche d'abord les RL ennemis (le plus proche)
-  if (t != nobody)[
-    launch-faf t ;;si on a un faf, on tire un faf
-    launch-rocket towardsxy ([xcor] of t) ([ycor] of t);;sinon on tire un missile
-    VPOP-go-toward t]
-  
-  let h min-one-of perceive-specific-robots ennemy RocketLaunchers [distance myself];;Puis l'ennemi le plus proche)
-  if (h != nobody)[
-    launch-faf h ;;si on a un faf, on tire un faf
-    launch-rocket towardsxy ([xcor] of h) ([ycor] of h);;sinon on tire un missile
-    VPOP-go-toward h]
-  
-end 
-
 to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, mem2 = timer récolte, mem3 = timer plantation, mem4 = limite de burger à ne pas planter, mem5[0] = etat du robot, mem5[1] = sous-etat du robot
-                                    ;;red-team-go-back-to-base
-                                    ;;red-team-harvesters-go-and-eat
-  
   (ifelse
-    item 0 mem5 = 0 [   ;Etat dans lequel l'harvester va chercher de la nourriture
+    ; RECHERCHE-ET-RECOLTE
+    item 0 mem5 = 0 [
       (ifelse
         item 1 mem5 = 0 [ 
           ;WANDER : se balade aléatoirement
           ;si a des coordonnées d'un tas -> passe à l'état de go vers le tas
-          ;sinon si voit un burger passe à l'état de récolte
+          ;ou si on voit un burger on passe en récolte
+          
+          ;si voit un burger on passe à l'état de récolte
           let burg one-of perceive-food
-          if (burg != nobody) [
-            
+          if (burg != nobody) [            
             VPOP-go-toward burg
             set mem5 replace-item 1 mem5 2
-            ;VPOP-replaceElement mem5 1 2 ;Passe directement à l'état de récolte car burger à portée : pas besoin de se déplacer
-            set mem2 30 ;180 est la durée pendant laquelle il va chercher de la nourriture en mode récolte
+            set mem2 30 ;30 est la durée pendant laquelle il va chercher de la nourriture en mode récolte (réinitialisée à chaque burger récolté)
           ]
-          ifelse(distance VPOP-closest-base < 35)
-          [random-move]
-          [VPOP-go-toward VPOP-closest-base]
+          
+          ;on laisse l'harvester se balader aléatoirement et librement tant qu'il reste à moins de 35 de la base
+          ifelse(distance VPOP-closest-base < 35)[
+            random-move
+          ][
+            VPOP-go-toward VPOP-closest-base
+          ]
+          
+          ;on regarde si on a reçu les coordonnées d'un tas auquel cas on va le récupérer
           if (item 0 mem1 != -1) [
             set mem5 replace-item 1 mem5 1
           ]      
         ]
         item 1 mem5 = 1 [   
-          ;GO-TO-BURGER : avance vers les coordonnées qu'il a enregistré
+          ;GO-TO-BURGER : avance vers les coordonnées de tas qu'il a enregistré
           VPOP-go-towardxy mem1
+          
           ;si arrivé aux coordonnées : passe en etat de récolte
           if (VPOP-has-arrived mem1 2)[
             set mem1 [-1 -1]  ;on oublie le tas
@@ -500,69 +528,74 @@ to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, me
           ]
         ]
         item 1 mem5 = 2 [  
-          ;;Recupere tout les burgers a portée
+          ;RECOLTE : Recupere tout les burgers a portée
+          ;Pour ça on le fait ramasser tous les burgers à porté, puis se déplacer vers les burgers visibles mais non atteignables ou de façon aléatoire
+          ;pendant un timer mem2 réinitialisé à chaque rammassage de burger
+          
+          ;On prend tous les burgers visibles
           let burgerPerceived min-one-of perceive-food [ distance myself ]
           while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
             take-food burgerPerceived
             set burgerPerceived min-one-of perceive-food [ distance myself ]
-            set mem2 30
+            set mem2 30 ;si on a récupéré un burger on reset le timer 
           ]
-          ;;Se dirige vers un autre burger et recupere tout les burgers a portée
           
-          ;          if (burgerPerceived != nobody)[ 
-          ;            VPOP-go-toward burgerPerceived
-          ;            while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
-          ;              take-food burgerPerceived
-          ;              set burgerPerceived min-one-of perceive-food [ distance myself ]
-          ;              set mem2 30
-          ;          ]]
-          ;          
-          ;          random-move
+          ;Se dirige vers un burger hors de portée pour pouvoir le récupérer au prochain tick ou aléatoirement si on n'en voit pas
           ifelse (burgerPerceived != nobody)[
             VPOP-go-toward burgerPerceived
           ][
             random-move
           ]
           
+          ;On décrémente le timer
           set mem2 (mem2 - 1)
+          ;A la fin du timer on passe au sur-état de retour à la base
           if (mem2 < 0 or carrying-food? > 15000)[
             set mem5 [1 0]
+            ;On détermine le minimum de burgers à garder lorsqu'on fait des plantations
             set mem4 (carrying-food? * 0.3)
-          ]
-          ;RECOLTE : pendant x tick wander autour des coord du tas et récolte ce qu'il voit
-          ;si il a récupéré un nouveau burger on reset le timer
-          ;à la fin du timer on passe à l'état retour de base          
+          ]        
       ])
     ]
-    item 0 mem5 = 1 [   ;Etat dans lequel l'harvester va retourner à la base
-                        ; se dirige vers la base, quand voit la base passe à l'état suivant
-                        ; si la distance à la base est < ??? planter un burger avant d'avancer
-                        ; si voit un explorer et que l'harvester carry > ?, donner le surplus à l'explorer
+    item 0 mem5 = 1 [   
+      ;RETOUR : Etat dans lequel l'harvester va retourner à la base
+      ; si la distance à la base est < X planter un burger si possible avant d'avancer, si impossible essayer en se décalant plusieurs fois sur le côté
+      ; l'harvester plantera de facon à toujours garder un minimum de burger à donner à la base
+      ; si voit un explorer et que l'harvester a Carrying-food? > Y, donner le surplus à l'explorer
+      
+      ;Si on voit des burgers sur le chemin du retour on les prend
+      ;mais sans passer en mode récolte et donc sans se détourner
       let burgerPerceived min-one-of perceive-food [ distance myself ]
       while [(burgerPerceived != nobody) and (distance burgerPerceived <= 2)] [
         take-food burgerPerceived
         set burgerPerceived min-one-of perceive-food [ distance myself ]
       ]
       
+      ;Si on est arrivé dans la zone de plantation autour de la base (15 autour de base - périmètre où tournent les rocket launchers en défense)
       let closest-base VPOP-closest-base
       ifelse (distance closest-base < 8 or (distance closest-base < 15 and distance closest-base > 11)) [
+        ;Si on manque d'énergie on en demande
         if (energy < 500)[          
           VPOP-ask-for-energy 1700
         ]
         
-        ; compte le nombre de graine ici
+        ;On essaie de planter :
+        ;On compte le nombre de graine ici
         let nb-seeds count Seeds-here
         ifelse (nb-seeds > 0)[
+          ;si il y a déjà une plantation sur le patch, on va essayer le patch à coté puis abandonner après 50 essais jusqu'à pouvoir à nouveau planter
           ifelse (mem3 > 50)[
-            ;n'arrive pas à planter : il faut avancer
+            ;n'arrive pas à planter : abandon, il faut avancer
             VPOP-go-toward closest-base            
           ][
+            ;on peut pas planter là mais c'est trop tôt pour abandonner : on tourne autour de la base en comptabilisant cette tentative
             set heading towards closest-base
             rt 90
             VPOP-forward-move speed
             set mem3 mem3 + 1
           ]
         ][
+          ;Si on peut planter on le fait à condition de garder un minimum de burgers (mem4)
           set mem3 0
           if (carrying-food? > mem4)[
             plant-seeds color max-seeds
@@ -570,6 +603,8 @@ to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, me
           VPOP-go-toward closest-base
         ]
         
+        ;S'il nous reste des burgers on essaie de les donner à la base, et si on n'a plus de burger on repart
+        ;(si on n'a pas assez d'énergie on retournera nec dans cet état qui nous rapproche de la base)
         ifelse (carrying-food? > 0) [
           let basePerceived one-of perceive-specific-robots color bases
           if (basePerceived != nobody) [
@@ -577,31 +612,31 @@ to goRedHarvester                   ;mem0 = carrying-food?, mem1 = coord tas, me
           ]
         ][
           set mem5 replace-item 0 mem5 0
-        ] 
-        
+        ]        
       ][
+        ;Si on est hors de la zone de plantation on se rapproche de la base
         VPOP-go-toward closest-base
-      ]
-      
-      
-      
+      ]     
   ])
   
   
   ; ====== A FAIRE QUELQUE SOIT L'ETAT ======
   
-  if (carrying-food? > 4000) [ ; 5 designe la quantité de burgers que l'harvester va garder pour pouvoir les planter
+  ;Si on a un surplus de burger, on regarde si on a un explorer à qui les donner
+  if (carrying-food? > 4000) [ ; 4000 designe la quantité de burgers que l'harvester va garder pour pouvoir les planter
     let explorerPerceived one-of perceive-specific-robots color explorers
     if (explorerPerceived != nobody) [
       give-food explorerPerceived (carrying-food? - 4000)
     ]
   ]   
   
-  ;si il y a un wall devant le recupérer
+  ;Si il y a un mur devant on le recupére pour liberer le passage
   let wallPerceived one-of perceive-walls
   if (wallPerceived != nobody)[
     take-wall wallPerceived
   ]
+  
+  ;Si on manque d'énergie on retourne à la base
   if (energy < 500) [
     set mem4 (carrying-food? * 0.3)
     set mem5 replace-item 0 mem5 1
@@ -719,49 +754,41 @@ to goRedBase
     ]
     set t one-of perceive-robots ennemy
     set tries tries + 1
-  ]
-  
+  ]  
 end
 
-to VPOP-report-ennemy-base[eBase]
-  if (mem2 != eBase) and (mem1 = -1)[
-    set mem1 eBase]
-end
-
-to VPOP-report-dead-ennemy-base[eBase]
-  set mem2 eBase
-  if (mem1 = eBase)[
-    set mem1 -1
-    set mem3 1
-  ]
-end
 
 ;; procedure pour initialiser les explorers rouges
 to initRedExplorer
-  set mem0 [-1 -1]
-  set mem1 [-1 -1]
-  set mem2 -1
-  set mem3 -1
-  set mem5 [0 0]
+  set mem0 [-1 -1]  ; emplacement des coordonnées du tas trouvé
+  set mem1 [-1 -1]  ; emplacement des coordonnées de la base ennemie trouvée ou espionnée
+  set mem2 -1       ; reference de l'harvester à aider
+  set mem3 -1       ; timer de check spy et timer de stop-spy
+  ;mem4             ; timer d'aide spy et coordonnées de la seconde base à laquelle il faut reporter la destruction de l'ennemi
+  set mem5 [0 0]    ; état [0] et priorité [1] de l'explorer
 end
 
 ;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
-  set mem1 -2; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
+  set mem1 -2       ; -1 -> en attente d'ordre; -2 -> toujours en defense; [x y] -> coordonées de la base ennemie
 end
 
 ;; procedure pour initialiser les harvesters rouges
 to initRedHarvester
-  set mem1 [-1 -1]
+  ;mem0             ; permet d'exposer carrying-food?
+  set mem1 [-1 -1]  ; coordonnées du tas à récupérer
+  ;mem2             ; timer de récolte
+  ;mem3             ; timer de plantation
+  ;mem4             ; limite de burger à garder pour la base lorsqu'on plante
   set mem5 [0 0]
 end
 
 ;; procedure pour initialiser les bases rouges
 to initRedBase
-  set mem0 [-1 -1] ;coordonées d'un tas
-  set mem1 -1 ;coordonées de la base ennemie
-  set mem2 -1;;coordonées de la base ennemie detruite
-  set mem3 7;
-  set mem6 99 ;nombre d'harvesters a produire ? a suprimer
-  set mem7 0 ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
+  set mem0 [-1 -1]  ;coordonées d'un tas
+  set mem1 -1       ;coordonées de la base ennemie
+  set mem2 -1       ;coordonées de la base ennemie detruite
+  set mem3 7
+  set mem6 99       ;nombre d'harvesters a produire ? a suprimer
+  set mem7 0        ;ordre de production des robots (0,1 -> Harvester; 2 -> Explorer; 3 -> RocketLauncher)
 end
