@@ -683,8 +683,12 @@ to goRedBase
         ]]
         mem7 = mem3[  
           if(count perceive-specific-robots color explorers < 7)[
-            new-Explorer self
-        ]]
+                        new-Explorer self
+            set mem4 mem4 + 1
+            if (mem4 > 3)[
+              ask one-of perceive-specific-robots color explorers [set mem5 [0 1]]
+              set mem4 0
+        ]]]
         mem7 < mem3 + 1 + increase-rl-production[      
           new-RocketLauncher self
         ]
